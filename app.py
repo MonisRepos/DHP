@@ -2,13 +2,13 @@ import os
 import json
 import logging
 import pandas as pd
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static")
 
 # Load state and city data from JSON file
 def load_states_and_cities():
@@ -34,33 +34,19 @@ def get_available_years():
 # Routes
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return send_from_directory('static', 'index.html')
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    return send_from_directory('static', 'about.html')
 
 @app.route("/team")
 def team():
-    return render_template("team.html")
+    return send_from_directory('static', 'team.html')
 
 @app.route("/analysis")
 def analysis():
-    # Get query parameters for pre-selecting dropdowns
-    selected_state = request.args.get("state", "")
-    selected_city = request.args.get("city", "")
-    selected_year = request.args.get("year", "")
-    
-    # Load available states and cities
-    states_and_cities = load_states_and_cities()
-    available_years = get_available_years()
-    
-    return render_template("analysis.html",
-                          states_and_cities=states_and_cities,
-                          available_years=available_years,
-                          selected_state=selected_state,
-                          selected_city=selected_city,
-                          selected_year=selected_year)
+    return send_from_directory('static', 'analysis.html')
 
 @app.route("/api/temperature")
 def api_temperature():

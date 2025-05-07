@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Data Analysis</title>
+  
+  <!-- Bootstrap - Replit themed CSS -->
+  <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts - Poppins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- D3.js -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  
+  <!-- Tippy.js for tooltips -->
+  <script src="https://unpkg.com/@popperjs/core@2"></script>
+  <script src="https://unpkg.com/tippy.js@6"></script>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+  
+  <style>
+    .chart-container {
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      background-color: var(--subtle);
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+    }
+    
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .chart-tools {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .spiralControls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .control-label {
+      min-width: 80px;
+    }
+    
+    .yearSelectRow {
+      margin: 1rem 0;
+    }
+    
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      flex-direction: column;
+      color: white;
+    }
+    
+    .filters {
+      padding: 1rem;
+      background-color: var(--subtle);
+      border-radius: var(--border-radius);
+      margin-bottom: 1.5rem;
+    }
+    
+    .filter-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .filter-group {
+      flex: 1;
+      min-width: 200px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="main-header">
+    <div class="logo">
+      <i class="fas fa-cloud-sun-rain"></i>
+      <span>Weather Insights</span>
+    </div>
+    <nav>
+      <button id="infoBtn" class="nav-button"><i class="fas fa-info-circle"></i> About Project</button>
+      <button id="teamBtn" class="nav-button"><i class="fas fa-users"></i> Our Team</button>
+      <button id="homeBtn" class="nav-button"><i class="fas fa-home"></i> Home</button>
+      <button id="themeToggle" class="nav-button">🌙</button>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container" style="padding-top: 2rem; padding-bottom: 2rem;">
+      <h1>Weather Data Analysis</h1>
+      <p class="lead">Explore historical temperature data for various cities in India with interactive charts and visualizations.</p>
+      
+      <!-- Filters Section -->
+      <div class="filters">
+        <h2><i class="fas fa-filter"></i> Data Filters</h2>
+        <div class="filter-row">
+          <div class="filter-group">
+            <label for="stateFilter">State:</label>
+            <select id="stateFilter" name="state" class="form-control">
+              <option value="">-- Select State --</option>
+              <!-- States populated by JS -->
+            </select>
+          </div>
+          
+          <div class="filter-group">
+            <label for="cityFilter">City:</label>
+            <select id="cityFilter" name="city" class="form-control" disabled>
+              <option value="">-- Select City --</option>
+              <!-- Cities populated by JS -->
+            </select>
+          </div>
+          
+          <div class="filter-group">
+            <label for="yearFilter">Year:</label>
+            <select id="yearFilter" name="year" class="form-control">
+              <option value="">All Years</option>
+              <!-- Years populated by JS -->
+            </select>
+          </div>
+          
+          <div class="filter-group" style="display: flex; align-items: flex-end;">
+            <button id="applyFiltersBtn" class="btn btn-primary" style="width: 100%; margin-top: 1.5rem;">Apply Filters</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Loading indicator -->
+      <div id="loader">
+        <div class="spinner-border text-light mb-3" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>Loading temperature data...</p>
+      </div>
+      
+      <!-- Temperature Spiral Visualization -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h2><i class="fas fa-circle-notch"></i> Temperature Spiral (1975-2022)</h2>
+          <div class="chart-tools">
+            <button class="btn btn-sm btn-outline-secondary" id="downloadSpiralBtn">
+              <i class="fas fa-download"></i>
+            </button>
+          </div>
+        </div>
+        <div style="text-align: center;">
+          <svg id="spiralChart" width="600" height="600"></svg>
+          <div class="spiralControls">
+            <div class="control-row">
+              <button id="playPauseBtn" class="btn btn-primary">Play</button>
+            </div>
+            <div class="control-row">
+              <span class="control-label">Speed:</span>
+              <input type="range" id="speedSlider" min="50" max="1000" value="250" class="form-range">
+            </div>
+            <div class="control-row">
+              <span class="control-label">Timeline:</span>
+              <input type="range" id="timeSlider" min="0" value="0" class="form-range">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Temperature Heatmap -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h2><i class="fas fa-th"></i> Temperature Heatmap</h2>
+          <div class="chart-tools">
+            <button class="btn btn-sm btn-outline-secondary" id="downloadHeatmapBtn">
+              <i class="fas fa-download"></i>
+            </button>
+          </div>
+        </div>
+        <div style="text-align: center; overflow-x: auto;">
+          <svg id="heatmapChart" width="800" height="400"></svg>
+        </div>
+      </div>
+      
+      <!-- Two Column Charts Grid -->
+      <div class="charts-grid">
+        <!-- Bar Chart Race -->
+        <div class="chart-container">
+          <div class="chart-header">
+            <h2><i class="fas fa-chart-bar"></i> Temperature Bar Chart Race</h2>
+          </div>
+          <canvas id="barRaceChart" height="300"></canvas>
+        </div>
+        
+        <!-- Yearly Line Chart -->
+        <div class="chart-container">
+          <div class="chart-header">
+            <h2><i class="fas fa-chart-line"></i> Yearly Temperature Trends</h2>
+          </div>
+          <canvas id="yearlyLineChart" height="300"></canvas>
+        </div>
+      </div>
+      
+      <!-- Single Year Analysis -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h2><i class="fas fa-calendar-alt"></i> Single Year Analysis</h2>
+        </div>
+        <div class="yearSelectRow">
+          <label for="yearSelect">Select Year:</label>
+          <select id="yearSelect" class="form-select"></select>
+        </div>
+        <canvas id="singleYearChart" height="300"></canvas>
+      </div>
+      
+      <!-- Min/Max Temperature Chart -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h2><i class="fas fa-temperature-high"></i> Min/Max Temperature Range</h2>
+        </div>
+        <div class="yearSelectRow">
+          <label for="minMaxYearSelect">Select Year:</label>
+          <select id="minMaxYearSelect" class="form-select"></select>
+        </div>
+        <canvas id="minMaxChart" height="300"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <p>&copy; 2025 Weather Insights Project | Data sourced from National Centers for Environmental Information</p>
+  </footer>
+
+  <!-- Project Info Modal -->
+  <div id="infoModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h2><i class="fas fa-info-circle"></i> About This Project</h2>
+
+      <div class="info-section">
+        <h3>Project Overview</h3>
+        <p>This 50-Year Weather Analysis tool provides insights into long-term weather patterns across India. By analyzing historical data from various weather stations, we can identify trends, anomalies, and patterns that help in understanding climate change impacts and seasonal variations.</p>
+      </div>
+
+      <div class="info-section">
+        <h3>Key Insights</h3>
+        <ul class="insights-list">
+          <li><i class="fas fa-temperature-high"></i> <strong>Temperature Trends:</strong> Average temperatures have increased by 1.2°C over the past 50 years across most regions.</li>
+          <li><i class="fas fa-chart-line"></i> <strong>Temperature Patterns:</strong> Temperature patterns show increasing variability across different regions.</li>
+          <li><i class="fas fa-wind"></i> <strong>Seasonal Shifts:</strong> Summer seasons are starting earlier and lasting longer in many northern states.</li>
+          <li><i class="fas fa-exclamation-triangle"></i> <strong>Extreme Events:</strong> Frequency of extreme weather events has increased by 30% in the last two decades.</li>
+        </ul>
+      </div>
+
+      <div class="info-section">
+        <h3>Data Sources</h3>
+        <p>Weather data has been collected from the National Centers for Environmental Information and includes daily recordings from weather stations across all states and union territories.</p>
+      </div>
+
+      <div class="info-section">
+        <h3>How to Use</h3>
+        <ol>
+          <li>Select a state from the dropdown menu</li>
+          <li>Choose a specific city within that state</li>
+          <li>Click the "Apply Filters" button</li>
+          <li>View historical weather data, trends, and insights for the selected location</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Members Modal -->
+  <div id="teamModal" class="modal hidden">
+    <div class="modal-content team-modal-content">
+      <span class="close-btn">&times;</span>
+      <h2><i class="fas fa-users"></i> Our Team</h2>
+
+      <div class="team-intro">
+        <p>Meet the dedicated team behind this 50-Year Weather Analysis project. Our diverse group of experts has worked together to bring you comprehensive insights into India's changing climate patterns.</p>
+      </div>
+
+      <div class="team-grid">
+        <!-- Team Member 1 -->
+        <div class="team-member">
+          <div class="member-photo">
+            <img src="/static/img/team_photos/Mani photo.jpg" alt="Mani Kumar">
+          </div>
+          <div class="member-info">
+            <h3>Mani Kumar</h3>
+            <p class="member-role">Project Lead & Frontend Developer</p>
+            <p class="member-description">Mani led the overall project development and created the interactive user interface. During the presentation, he will demonstrate the application's frontend features, explain the user experience design, and showcase how the visualizations enhance data understanding.</p>
+            <div class="presentation-points">
+              <h4>Presentation Focus:</h4>
+              <ul>
+                <li>Overview of the 50-year weather analysis project</li>
+                <li>Frontend architecture and responsive design</li>
+                <li>Interactive visualization components</li>
+                <li>User experience and interface design</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Member 2 -->
+        <div class="team-member">
+          <div class="member-photo">
+            <img src="/static/img/team_photos/monish_photo.jpg" alt="Monish">
+          </div>
+          <div class="member-info">
+            <h3>Monish</h3>
+            <p class="member-role">Backend Developer</p>
+            <p class="member-description">Monish developed the backend systems and APIs that power the application. During the presentation, he will explain the server architecture, database design, and how the backend processes and serves data to the frontend visualizations.</p>
+            <div class="presentation-points">
+              <h4>Presentation Focus:</h4>
+              <ul>
+                <li>Backend architecture and API design</li>
+                <li>Server-side data processing</li>
+                <li>Database structure and optimization</li>
+                <li>Integration with frontend components</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Member 3 -->
+        <div class="team-member">
+          <div class="member-photo">
+            <img src="/static/img/team_photos/Ravi_photo.jpg" alt="Ravi Maurya">
+          </div>
+          <div class="member-info">
+            <h3>Ravi Maurya</h3>
+            <p class="member-role">Data Scraper & Data Engineer</p>
+            <p class="member-description">Ravi collected and processed the 50-year weather data from various sources. In the presentation, he will explain the data collection methodology, how the CSV files are structured and cleaned, and the techniques used to ensure data accuracy and completeness.</p>
+            <div class="presentation-points">
+              <h4>Presentation Focus:</h4>
+              <ul>
+                <li>Data collection and scraping techniques</li>
+                <li>Data cleaning and preprocessing</li>
+                <li>CSV file structure and organization</li>
+                <li>Data quality assurance and validation</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="team-footer">
+        <p>Our team is committed to providing accurate and insightful climate data analysis. If you have questions or feedback about our project, please contact us at <a href="mailto:team@weatherinsights.org">team@weatherinsights.org</a>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Files -->
+  <script src="/static/js/charts.js"></script>
+  <script>
+    // Navigation and modal handling
+    document.getElementById('homeBtn').addEventListener('click', function() {
+      window.location.href = '/';
+    });
+    
+    document.getElementById('infoBtn').addEventListener('click', function() {
+      document.getElementById('infoModal').classList.remove('hidden');
+    });
+    
+    document.getElementById('teamBtn').addEventListener('click', function() {
+      document.getElementById('teamModal').classList.remove('hidden');
+    });
+    
+    // Close buttons for modals
+    document.querySelectorAll('.close-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.getElementById('infoModal').classList.add('hidden');
+        document.getElementById('teamModal').classList.add('hidden');
+      });
+    });
+    
+    // Close modals when clicking outside content
+    window.addEventListener('click', function(event) {
+      if (event.target === document.getElementById('infoModal')) {
+        document.getElementById('infoModal').classList.add('hidden');
+      }
+      if (event.target === document.getElementById('teamModal')) {
+        document.getElementById('teamModal').classList.add('hidden');
+      }
+    });
+    
+    // Load state and city data
+    function loadStates() {
+      fetch('/api/states')
+        .then(response => response.json())
+        .then(data => {
+          const stateSelect = document.getElementById('stateFilter');
+          stateSelect.innerHTML = '<option value="">-- Select State --</option>';
+          
+          Object.keys(data).sort().forEach(state => {
+            const option = document.createElement('option');
+            option.value = state;
+            option.textContent = state;
+            stateSelect.appendChild(option);
+          });
+        })
+        .catch(error => console.error('Error loading states:', error));
+    }
+    
+    // State change event
+    document.getElementById('stateFilter').addEventListener('change', function() {
+      const stateSelect = this;
+      const citySelect = document.getElementById('cityFilter');
+      const selectedState = stateSelect.value;
+      
+      if (selectedState) {
+        fetch('/api/states')
+          .then(response => response.json())
+          .then(data => {
+            citySelect.disabled = false;
+            citySelect.innerHTML = '<option value="">-- Select City --</option>';
+            
+            if (data[selectedState]) {
+              data[selectedState].sort().forEach(city => {
+                const option = document.createElement('option');
+                option.value = city;
+                option.textContent = city;
+                citySelect.appendChild(option);
+              });
+            }
+          })
+          .catch(error => console.error('Error loading cities:', error));
+      } else {
+        citySelect.innerHTML = '<option value="">-- First Select a State --</option>';
+        citySelect.disabled = true;
+      }
+    });
+    
+    // Load year options
+    function loadYears() {
+      fetch('/api/years')
+        .then(response => response.json())
+        .then(years => {
+          const yearFilter = document.getElementById('yearFilter');
+          yearFilter.innerHTML = '<option value="">All Years</option>';
+          
+          years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearFilter.appendChild(option);
+          });
+        })
+        .catch(error => console.error('Error loading years:', error));
+    }
+    
+    // Apply filters button
+    document.getElementById('applyFiltersBtn').addEventListener('click', function() {
+      const state = document.getElementById('stateFilter').value;
+      const city = document.getElementById('cityFilter').value;
+      const year = document.getElementById('yearFilter').value;
+      
+      if (!state || !city) {
+        alert('Please select both a state and a city.');
+        return;
+      }
+      
+      // Show loading
+      document.getElementById('loader').style.display = 'flex';
+      
+      // Fetch filtered data
+      fetch(`/api/temperature?state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}${year ? `&year=${year}` : ''}`)
+        .then(response => response.json())
+        .then(data => {
+          // Hide loader
+          document.getElementById('loader').style.display = 'none';
+          
+          // Prepare data for charts
+          const tempData = data.map(d => ({
+            year: +d.Year,
+            month: +d.Month,
+            temperature: +d["Temperature (°C)"],
+            minTemp: +d.Min_Temp_C,
+            maxTemp: +d.Max_Temp_C
+          }));
+          
+          // Initialize each chart
+          allData = tempData;
+          spiralData = [...tempData];
+          
+          // Update chart titles
+          document.querySelectorAll('.chart-container h2').forEach(h => {
+            if (h.textContent.includes('(')) {
+              const baseText = h.textContent.split('(')[0].trim();
+              h.textContent = `${baseText} (${city}, ${state})`;
+            }
+          });
+          
+          // Render all charts
+          renderSpiral(spiralData);
+          renderHeatmap(allData);
+          renderBarChartRace(allData);
+          renderYearlyLine(allData);
+          initSingleYearSelector();
+          renderSingleYear(allData);
+          initMinMaxSelector();
+          renderMinMax(allData);
+        })
+        .catch(error => {
+          console.error('Error fetching temperature data:', error);
+          document.getElementById('loader').style.display = 'none';
+          alert('Error loading temperature data. Please try again.');
+        });
+    });
+    
+    // Theme toggle
+    const toggle = document.getElementById("themeToggle");
+    const root = document.documentElement;
+    const current = localStorage.getItem("theme") || "dark";
+    root.setAttribute("data-theme", current);
+    toggle.textContent = current === "light" ? "🌙" : "☀️";
+    toggle.addEventListener("click", () => {
+      const next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+      root.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      toggle.textContent = next === "light" ? "🌙" : "☀️";
+    });
+    
+    // Initialize when the page loads
+    window.addEventListener('DOMContentLoaded', function() {
+      loadStates();
+      loadYears();
+      
+      // Initialize loader
+      document.getElementById('loader').style.display = 'none';
+    });
+  </script>
+</body>
+</html>

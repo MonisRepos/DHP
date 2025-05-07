@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Analysis Dashboard - 50 Years of Weather Data</title>
+  
+  <!-- Bootstrap - Replit themed CSS -->
+  <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts - Poppins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- D3.js -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  
+  <!-- Tippy.js for tooltips -->
+  <script src="https://unpkg.com/@popperjs/core@2"></script>
+  <script src="https://unpkg.com/tippy.js@6"></script>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="main-header">
+    <div class="logo">
+      <i class="fas fa-cloud-sun-rain"></i>
+      <span>Weather Insights</span>
+    </div>
+    <nav>
+      <button id="infoBtn" class="nav-button"><i class="fas fa-info-circle"></i> About Project</button>
+      <button id="teamBtn" class="nav-button"><i class="fas fa-users"></i> Our Team</button>
+      <button id="homeBtn" class="nav-button"><i class="fas fa-home"></i> Home</button>
+      <button id="themeToggle" class="nav-button">🌙</button>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <!-- Intro Section -->
+    <section id="intro" class="intro">
+      <div class="intro-content">
+        <h1>🌦️ 50-Year Weather Analysis</h1>
+        <p class="tagline">Explore long-term climate trends, city-specific weather patterns, and gain actionable insights for research and planning.</p>
+        <div class="features">
+          <div class="feature-item">
+            <i class="fas fa-chart-line"></i>
+            <h3>Historical Trends</h3>
+            <p>Analyze 50 years of weather data to identify long-term patterns</p>
+          </div>
+          <div class="feature-item">
+            <i class="fas fa-map-marked-alt"></i>
+            <h3>Location-Specific</h3>
+            <p>Compare weather patterns across different states and cities in India</p>
+          </div>
+          <div class="feature-item">
+            <i class="fas fa-lightbulb"></i>
+            <h3>Actionable Insights</h3>
+            <p>Make informed decisions based on historical weather data</p>
+          </div>
+        </div>
+        <button id="startBtn" class="cta-button">Get Started <i class="fas fa-arrow-right"></i></button>
+        <button id="insightsBtn" class="cta-button" style="background-color: var(--secondary); margin-left: 20px;">Key Insights <i class="fas fa-search"></i></button>
+      </div>
+    </section>
+
+    <!-- Main Content (hidden initially) -->
+    <section id="mainContent" class="hidden">
+      <div class="dashboard">
+        <div class="search-container">
+          <h2><i class="fas fa-search-location"></i> Find Weather Data</h2>
+          <div class="dropdown-group">
+            <label for="stateSelect">Select State</label>
+            <select id="stateSelect">
+              <option value="">-- Select State --</option>
+              <!-- States populated by JS -->
+            </select>
+          </div>
+
+          <div class="dropdown-group">
+            <label for="citySelect">Select City</label>
+            <select id="citySelect" disabled>
+              <option value="">-- First Select a State --</option>
+              <!-- Cities populated by JS after state selection -->
+            </select>
+          </div>
+
+          <button id="searchBtn" class="action-button"><i class="fas fa-search"></i> Search Weather Data</button>
+        </div>
+
+        <div class="graph-section">
+          <h2><i class="fas fa-chart-bar"></i> Weather Insights</h2>
+          <div id="graphArea" class="data-display">
+            <div class="placeholder-content">
+              <i class="fas fa-cloud-sun fa-3x"></i>
+              <p>Select a state and city to view weather data and insights</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <p>&copy; 2025 Weather Insights Project | Data sourced from National Centers for Environmental Information</p>
+  </footer>
+
+  <!-- Project Info Modal -->
+  <div id="infoModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h2><i class="fas fa-info-circle"></i> About This Project</h2>
+
+      <div class="info-section">
+        <h3>Project Overview</h3>
+        <p>This 50-Year Weather Analysis tool provides insights into long-term weather patterns across India. By analyzing historical data from various weather stations, we can identify trends, anomalies, and patterns that help in understanding climate change impacts and seasonal variations.</p>
+      </div>
+
+      <div class="info-section">
+        <h3>Key Insights</h3>
+        <ul class="insights-list">
+          <li><i class="fas fa-temperature-high"></i> <strong>Temperature Trends:</strong> Average temperatures have increased by 1.2°C over the past 50 years across most regions.</li>
+          <li><i class="fas fa-chart-line"></i> <strong>Temperature Patterns:</strong> Temperature patterns show increasing variability across different regions.</li>
+          <li><i class="fas fa-wind"></i> <strong>Seasonal Shifts:</strong> Summer seasons are starting earlier and lasting longer in many northern states.</li>
+          <li><i class="fas fa-exclamation-triangle"></i> <strong>Extreme Events:</strong> Frequency of extreme weather events has increased by 30% in the last two decades.</li>
+        </ul>
+      </div>
+
+      <div class="info-section">
+        <h3>Data Sources</h3>
+        <p>Weather data has been collected from the National Centers for Environmental Information and includes daily recordings from weather stations across all states and union territories.</p>
+      </div>
+
+      <div class="info-section">
+        <h3>How to Use</h3>
+        <ol>
+          <li>Select a state from the dropdown menu</li>
+          <li>Choose a specific city within that state</li>
+          <li>Click the "Search Weather Data" button</li>
+          <li>View historical weather data, trends, and insights for the selected location</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Insights Modal -->
+  <div id="insightsModal" class="modal hidden">
+    <div class="modal-content" style="width: 95%; max-width: 1000px;">
+      <span class="close-btn">&times;</span>
+      <h2><i class="fas fa-lightbulb"></i> Key Weather Insights</h2>
+
+      <div class="insights-dashboard">
+        <div class="insights-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+          <div class="insight-card" style="background-color: var(--subtle); padding: 20px; border-radius: var(--border-radius);">
+            <h3><i class="fas fa-temperature-high"></i> Temperature Increase</h3>
+            <div class="insight-chart-container" style="height: 250px;">
+              <canvas id="tempIncreaseChart"></canvas>
+            </div>
+            <p><strong>Insight:</strong> Average annual temperatures have risen by 1.2°C since 1975, with accelerated warming in the last two decades.</p>
+          </div>
+          
+          <div class="insight-card" style="background-color: var(--subtle); padding: 20px; border-radius: var(--border-radius);">
+            <h3><i class="fas fa-calendar-day"></i> Hot Days Increase</h3>
+            <div class="insight-chart-container" style="height: 250px;">
+              <canvas id="hotDaysChart"></canvas>
+            </div>
+            <p><strong>Insight:</strong> Number of days above 35°C has increased by 28% in the last decade compared to the 1975-1985 period.</p>
+          </div>
+          
+          <div class="insight-card" style="background-color: var(--subtle); padding: 20px; border-radius: var(--border-radius);">
+            <h3><i class="fas fa-mountain"></i> Urban vs Rural Warming</h3>
+            <div class="insight-chart-container" style="height: 250px;">
+              <canvas id="urbanRuralChart"></canvas>
+            </div>
+            <p><strong>Insight:</strong> Urban areas show 0.7°C more warming than rural areas, demonstrating heat island effects.</p>
+          </div>
+          
+          <div class="insight-card" style="background-color: var(--subtle); padding: 20px; border-radius: var(--border-radius);">
+            <h3><i class="fas fa-globe-asia"></i> Regional Variation</h3>
+            <div class="insight-chart-container" style="height: 250px;">
+              <canvas id="regionalVariationChart"></canvas>
+            </div>
+            <p><strong>Insight:</strong> Northern states show 0.4°C more warming than southern states, with northwest India experiencing the most significant changes.</p>
+          </div>
+        </div>
+        
+        <div class="major-insights" style="margin-top: 30px; padding: 20px; background-color: var(--subtle); border-radius: var(--border-radius);">
+          <h3>Temperature Spiral Animation</h3>
+          <div style="display: flex; flex-direction: column; align-items: center; margin-top: 20px;">
+            <div style="width: 600px; height: 600px; position: relative;">
+              <svg id="insightSpiralChart" width="600" height="600"></svg>
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5rem; font-weight: bold;" id="spiralYearLabel"></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; margin-top: 20px;">
+              <button id="spiralPlayBtn" class="btn btn-primary">Play Animation</button>
+              <div style="flex-grow: 1; display: flex; align-items: center; gap: 10px;">
+                <span style="width: 50px;">1975</span>
+                <input type="range" id="spiralYearSlider" min="0" max="47" value="0" style="flex-grow: 1;">
+                <span style="width: 50px;">2022</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 20px;">
+            <p><strong>Key Finding:</strong> The spiral visualization reveals how average temperatures have consistently increased over the decades, with most recent years clustering at the outer edges, indicating higher temperatures across all seasons.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Members Modal -->
+  <div id="teamModal" class="modal hidden">
+    <div class="modal-content team-modal-content">
+      <span class="close-btn">&times;</span>
+      <h2><i class="fas fa-users"></i> Our Team</h2>
+
+      <div class="team-intro">
+        <p>Meet the dedicated team behind this 50-Year Weather Analysis project. Our diverse group of experts has worked together to bring you comprehensive insights into India's changing climate patterns.</p>
+      </div>
+
+      <div class="team-grid">
+        <!-- Team Member 1 -->
+        <div class="team-member">
+          <div class="member-photo">
+            <img src="/static/img/team_photos/Mani photo.jpg" alt="Mani Kumar">
+          </div>
+          <div class="member-info">
+            <h3>Mani Kumar</h3>
+            <p class="member-role">Project Lead & Frontend Developer</p>
+            <p class="member-description">Mani led the overall project development and created the interactive user interface. During the presentation, he will demonstrate the application's frontend features, explain the user experience design, and showcase how the visualizations enhance data understanding.</p>
+            <div class="presentation-points">
+              <h4>Presentation Focus:</h4>
+              <ul>
+                <li>Overview of the 50-year weather analysis project</li>
+                <li>Frontend architecture and responsive design</li>
+                <li>Interactive visualization components</li>
+                <li>User experience and interface design</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Member 2 -->
+        <div class="team-member">
+          <div class="member-photo">
+            <img src="/static/img/team_photos/monish_photo.jpg" alt="Monish">
+          </div>
+          <div class="member-info">
+            <h3>Monish</h3>
+            <p class="member-role">Backend Developer</p>
+            <p class="member-description">Monish developed the backend systems and APIs that power the application. During the presentation, he will explain the server architecture, database design, and how the backend processes and serves data to the frontend visualizations.</p>
+            <div class="presentation-points">
+              <h4>Presentation Focus:</h4>
+              <ul>
+                <li>Backend architecture and API design</li>
+                <li>Server-side data processing</li>
+                <li>Database structure and optimization</li>
+                <li>Integration with frontend components</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Member 3 -->
+        <div class="team-member">
+          <div class="member-photo">
+            <img src="/static/img/team_photos/Ravi_photo.jpg" alt="Ravi Maurya">
+          </div>
+          <div class="member-info">
+            <h3>Ravi Maurya</h3>
+            <p class="member-role">Data Scraper & Data Engineer</p>
+            <p class="member-description">Ravi collected and processed the 50-year weather data from various sources. In the presentation, he will explain the data collection methodology, how the CSV files are structured and cleaned, and the techniques used to ensure data accuracy and completeness.</p>
+            <div class="presentation-points">
+              <h4>Presentation Focus:</h4>
+              <ul>
+                <li>Data collection and scraping techniques</li>
+                <li>Data cleaning and preprocessing</li>
+                <li>CSV file structure and organization</li>
+                <li>Data quality assurance and validation</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="team-footer">
+        <p>Our team is committed to providing accurate and insightful climate data analysis. If you have questions or feedback about our project, please contact us at <a href="mailto:team@weatherinsights.org">team@weatherinsights.org</a>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Indicator -->
+  <div id="loader" style="display: none;">
+    <div class="spinner-border text-light" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p style="margin-top: 20px; color: white;">Loading temperature data...</p>
+  </div>
+
+  <!-- JavaScript Files -->
+  <script src="/static/js/insights.js"></script>
+  <script src="/static/js/main.js"></script>
+  
+  <script>
+    // Additional setup for the insights modal
+    document.getElementById('insightsBtn').addEventListener('click', function() {
+      document.getElementById('insightsModal').classList.remove('hidden');
+      
+      // Initialize the insights charts when the modal is opened
+      initInsightsCharts();
+    });
+    
+    // Close button for insights modal
+    document.querySelector('#insightsModal .close-btn').addEventListener('click', function() {
+      document.getElementById('insightsModal').classList.add('hidden');
+    });
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', function(event) {
+      if (event.target === document.getElementById('insightsModal')) {
+        document.getElementById('insightsModal').classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
