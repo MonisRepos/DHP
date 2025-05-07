@@ -12,89 +12,57 @@ let allData = [],
     singleYearChart = null,
     minMaxChart = null;
 
-// Get parameters from URL
-function getUrlParams() {
-  const params = new URLSearchParams(window.location.search);
-  return {
-    state: params.get('state') || 'Delhi',
-    city: params.get('city') || 'Delhi',
-    year: params.get('year') || '2022',
-    month: params.get('month') || ''
-  };
-}
+// Show loading spinner
+const loader = document.getElementById("loader");
+loader.style.display = "flex";
 
-// Update charts based on selection
-function updateCharts() {
-  const params = getUrlParams();
-  const url = `${API_URL}?state=${params.state}&city=${params.city}${params.year ? `&year=${params.year}` : ''}${params.month ? `&month=${params.month}` : ''}`;
-  
-  // Show loading spinner
-  const loader = document.getElementById("loader");
-  loader.style.display = "flex";
-  
-  d3.json(url).then(raw => {
-    // Parse data
-    allData = raw.map(d => ({
-      year: +d.Year,
-      month: +d.Month,
-      temperature: +d["Temperature (°C)"],
-      minTemp: +d["Min_Temp_C"],
-      maxTemp: +d["Max_Temp_C"]
-    }));
-    spiralData = [...allData];
-    
-    // Hide loader
-    loader.style.display = "none";
-    
-    // Chart.js theme defaults
-    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--bs-body-color').trim();
-    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--bs-border-color').trim();
-    Chart.defaults.color = textColor;
-    Chart.defaults.borderColor = gridColor;
-    Chart.defaults.font.family = "'Poppins', sans-serif";
-    
-    // Clear existing charts
-    clearCharts();
-    
-    // Render all charts
-    renderSpiral(spiralData);
-    renderHeatmap(allData);
-    renderBarChartRace(allData);
-    renderYearlyLine(allData);
-    initSingleYearSelector();
-    renderSingleYear(allData);
-    initMinMaxSelector();
-    renderMinMax(allData);
-  }).catch(error => {
-    console.error("Error fetching data:", error);
-    loader.style.display = "none";
-    document.getElementById("chartError").textContent = "Error loading data. Please try again.";
-    document.getElementById("chartError").style.display = "block";
+d3.json(API_URL).then(raw => {
+  // Parse data
+  allData = raw.map(d => ({
+    year: +d.Year,
+    month: +d.Month,
+    temperature: +d["Temperature (°C)"],
+    minTemp: +d["Min_Temp_C"],
+    maxTemp: +d["Max_Temp_C"]
+  }));
+  spiralData = [...allData];
+
+  // Hide loader
+  loader.style.display = "none";
+
+  // Chart.js theme defaults
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+  const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--subtle').trim();
+  Chart.defaults.color = textColor;
+  Chart.defaults.borderColor = gridColor;
+  Chart.defaults.font.family = "'Poppins', sans-serif";
+
+  // Render all charts
+  renderSpiral(spiralData);
+  renderHeatmap(allData);
+  renderBarChartRace(allData);
+  renderYearlyLine(allData);
+  initSingleYearSelector();
+  renderSingleYear(allData);
+  initMinMaxSelector();
+  renderMinMax(allData);
+
+  // Theme toggle logic
+  const toggle = document.getElementById("themeToggle");
+  const root = document.documentElement;
+  const current = localStorage.getItem("theme") || "light";
+  root.setAttribute("data-theme", current);
+  toggle.textContent = current === "light" ? "🌙" : "☀️";
+  toggle.addEventListener("click", () => {
+    const next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+    root.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+    toggle.textContent = next === "light" ? "🌙" : "☀️";
   });
-}
-
-function clearCharts() {
-  // Clear D3 charts
-  d3.select("#spiralChart").selectAll("*").remove();
-  d3.select("#heatmapChart").selectAll("*").remove();
-  
-  // Clear Chart.js charts
-  if (raceChart) raceChart.destroy();
-  if (yearlyLineChart) yearlyLineChart.destroy();
-  if (singleYearChart) singleYearChart.destroy();
-  if (minMaxChart) minMaxChart.destroy();
-  
-  // Clear error messages
-  document.getElementById("chartError").style.display = "none";
-}
+});
 
 /** 1. Interactive Temperature Spiral */
 function renderSpiral(data) {
-  if (data.length === 0) {
-    console.warn("No data available for spiral chart");
-    return;
-  }
-
   const svg    = d3.select("#spiralChart"),
         W      = +svg.attr("width"),
         H      = +svg.attr("height"),
@@ -142,12 +110,12 @@ function renderSpiral(data) {
 
   const path = g.append("path")
     .attr("fill", "none")
-    .attr("stroke", "var(--bs-danger)")
+    .attr("stroke", "red")
     .attr("stroke-width", 2);
 
   const head = g.append("circle")
     .attr("r", 4)
-    .attr("fill", "var(--bs-dark)");
+    .attr("fill", "#333");
 
   const yearLabel = g.append("text")
     .attr("text-anchor", "middle")
@@ -201,11 +169,6 @@ function renderSpiral(data) {
 
 /** 2. Yearly Heatmap */
 function renderHeatmap(data) {
-  if (data.length === 0) {
-    console.warn("No data available for heatmap chart");
-    return;
-  }
-  
   const svg    = d3.select("#heatmapChart"),
         m      = {top:30,right:10,bottom:40,left:60},
         W      = +svg.attr("width") - m.left - m.right,
@@ -228,9 +191,7 @@ function renderHeatmap(data) {
     .attr("data-tippy-content", d => `${monthNames[d.month-1]} ${d.year}: ${d.temperature.toFixed(1)}°C`);
 
   // Initialize Tippy tooltips on heatmap cells
-  if (typeof tippy === 'function') {
-    tippy(cells.nodes(), { theme: 'light-border', animation: 'scale' });
-  }
+  tippy(cells.nodes(), { theme: 'light-border', animation: 'scale' });
 
   // Axes
   g.append("g")
@@ -250,11 +211,6 @@ function renderHeatmap(data) {
 
 /** 3. Bar Chart Race */
 function renderBarChartRace(data) {
-  if (data.length === 0) {
-    console.warn("No data available for bar race chart");
-    return;
-  }
-  
   const ctx   = document.getElementById("barRaceChart").getContext("2d"),
         years = [...new Set(data.map(d=>d.year))].sort((a,b)=>a-b),
         monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -265,44 +221,23 @@ function renderBarChartRace(data) {
     type: "bar",
     data: {
       labels: init.map(d => monthNames[d.month-1]),
-      datasets: [{ 
-        label: `Year ${years[0]}`, 
-        data: init.map(d => d.temperature), 
-        backgroundColor: "var(--bs-primary)"
-      }]
+      datasets: [{ label: `Year ${years[0]}`, data: init.map(d => d.temperature), backgroundColor: "#444" }]
     },
-    options: { 
-      indexAxis: "y", 
-      responsive: true, 
-      animation: { duration: 800 },
-      plugins: {
-        title: {
-          display: true,
-          text: 'Monthly Temperature Bar Chart Race'
-        }
-      }
-    }
+    options: { indexAxis: "y", responsive: true, animation: { duration: 800 } }
   });
 
   setInterval(() => {
-    if (years.length > 0) {
-      raceIdx = (raceIdx + 1) % years.length;
-      const yr = years[raceIdx], arr = data.filter(d=>d.year===yr);
-      raceChart.data.labels = arr.map(d=>monthNames[d.month-1]);
-      raceChart.data.datasets[0].label = `Year ${yr}`;
-      raceChart.data.datasets[0].data = arr.map(d=>d.temperature);
-      raceChart.update();
-    }
+    raceIdx = (raceIdx + 1) % years.length;
+    const yr = years[raceIdx], arr = data.filter(d=>d.year===yr);
+    raceChart.data.labels = arr.map(d=>monthNames[d.month-1]);
+    raceChart.data.datasets[0].label = `Year ${yr}`;
+    raceChart.data.datasets[0].data = arr.map(d=>d.temperature);
+    raceChart.update();
   }, 2000);
 }
 
 /** 4. Year-by-Year Line */
 function renderYearlyLine(data) {
-  if (data.length === 0) {
-    console.warn("No data available for yearly line chart");
-    return;
-  }
-  
   const ctx   = document.getElementById("yearlyLineChart").getContext("2d"),
         years = [...new Set(data.map(d=>d.year))].sort((a,b)=>a-b);
 
@@ -314,58 +249,19 @@ function renderYearlyLine(data) {
   if (yearlyLineChart) yearlyLineChart.destroy();
   yearlyLineChart = new Chart(ctx, {
     type: "line",
-    data: { 
-      labels: years, 
-      datasets: [{ 
-        label: "Avg Temp (°C)", 
-        data: avg, 
-        tension: 0.3,
-        borderColor: "var(--bs-success)",
-        backgroundColor: "var(--bs-success)"
-      }] 
-    },
-    options: { 
-      responsive: true, 
-      scales: { 
-        x: { title: { display: true, text: "Year" } }, 
-        y: { title: { display: true, text: "°C" } } 
-      },
-      plugins: {
-        title: {
-          display: true,
-          text: 'Year-by-Year Average Temperature'
-        }
-      }
-    }
+    data: { labels: years, datasets: [{ label: "Avg Temp (°C)", data: avg, tension: 0.3 }] },
+    options: { responsive: true, scales: { x: { title: { display: true, text: "Year" } }, y: { title: { display: true, text: "°C" } } } }
   });
 }
 
 /** 5. Single-Year Line */
 function initSingleYearSelector() {
-  const sel = document.getElementById("yearSelect"), 
-        years = [...new Set(allData.map(d=>d.year))].sort((a,b)=>a-b);
-  
-  // Clear existing options
-  sel.innerHTML = '';
-  
-  // Add new options
+  const sel = document.getElementById("yearSelect"), years = [...new Set(allData.map(d=>d.year))].sort((a,b)=>a-b);
   years.forEach(y => sel.appendChild(Object.assign(document.createElement("option"), { value: y, textContent: y })));
-  
-  // Set default value if available
-  if (years.length > 0) {
-    const urlParams = getUrlParams();
-    sel.value = urlParams.year || years[years.length - 1];
-  }
-  
   sel.onchange = () => renderSingleYear(allData);
 }
 
 function renderSingleYear(data) {
-  if (data.length === 0) {
-    console.warn("No data available for single year chart");
-    return;
-  }
-  
   const year = +document.getElementById("yearSelect").value,
         monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
         arr = data.filter(d=>d.year===year).sort((a,b)=>a.month-b.month),
@@ -376,60 +272,19 @@ function renderSingleYear(data) {
   if (singleYearChart) singleYearChart.destroy();
   singleYearChart = new Chart(ctx, {
     type: "line",
-    data: { 
-      labels, 
-      datasets: [{ 
-        label: `${year}`, 
-        data: temps, 
-        fill: false, 
-        tension: 0.3, 
-        pointRadius: 4,
-        borderColor: "var(--bs-info)",
-        backgroundColor: "var(--bs-info)"
-      }] 
-    },
-    options: { 
-      responsive: true, 
-      scales: { 
-        x: { title: { display: true, text: "Month" } }, 
-        y: { title: { display: true, text: "°C" } } 
-      },
-      plugins: {
-        title: {
-          display: true,
-          text: `Monthly Temperature for ${year}`
-        }
-      }
-    }
+    data: { labels, datasets: [{ label: `${year}`, data: temps, fill: false, tension: 0.3, pointRadius: 4 }] },
+    options: { responsive: true, scales: { x: { title: { display: true, text: "Month" } }, y: { title: { display: true, text: "°C" } } } }
   });
 }
 
 /** 6. Min/Max Single-Year Line */
 function initMinMaxSelector() {
-  const sel = document.getElementById("minMaxYearSelect"), 
-        years = [...new Set(allData.map(d=>d.year))].sort((a,b)=>a-b);
-  
-  // Clear existing options
-  sel.innerHTML = '';
-  
-  // Add new options
+  const sel = document.getElementById("minMaxYearSelect"), years = [...new Set(allData.map(d=>d.year))].sort((a,b)=>a-b);
   years.forEach(y => sel.appendChild(Object.assign(document.createElement("option"), { value: y, textContent: y })));
-  
-  // Set default value if available
-  if (years.length > 0) {
-    const urlParams = getUrlParams();
-    sel.value = urlParams.year || years[years.length - 1];
-  }
-  
   sel.onchange = () => renderMinMax(allData);
 }
 
 function renderMinMax(data) {
-  if (data.length === 0) {
-    console.warn("No data available for min/max chart");
-    return;
-  }
-  
   const year = +document.getElementById("minMaxYearSelect").value,
         monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
         arr = data.filter(d=>d.year===year).sort((a,b)=>a.month-b.month),
@@ -444,61 +299,10 @@ function renderMinMax(data) {
     data: {
       labels,
       datasets: [
-        { 
-          label: "Min Temp (°C)", 
-          data: minVals, 
-          fill: false, 
-          tension: 0.3, 
-          pointRadius: 4,
-          borderColor: "var(--bs-primary)",
-          backgroundColor: "var(--bs-primary)" 
-        },
-        { 
-          label: "Max Temp (°C)", 
-          data: maxVals, 
-          fill: false, 
-          tension: 0.3, 
-          pointRadius: 4,
-          borderColor: "var(--bs-danger)",
-          backgroundColor: "var(--bs-danger)"
-        }
+        { label: "Min Temp (°C)", data: minVals, fill: false, tension: 0.3, pointRadius: 4 },
+        { label: "Max Temp (°C)", data: maxVals, fill: false, tension: 0.3, pointRadius: 4 }
       ]
     },
-    options: { 
-      responsive: true, 
-      scales: { 
-        x: { title: { display: true, text: "Month" } }, 
-        y: { title: { display: true, text: "°C" } } 
-      },
-      plugins: {
-        title: {
-          display: true,
-          text: `Min/Max Temperature for ${year}`
-        }
-      }
-    }
+    options: { responsive: true, scales: { x: { title: { display: true, text: "Month" } }, y: { title: { display: true, text: "°C" } } } }
   });
 }
-
-// Initialize tooltips and theme toggle
-document.addEventListener('DOMContentLoaded', function() {
-  // Theme toggle logic
-  const toggle = document.getElementById("themeToggle");
-  if (toggle) {
-    const root = document.documentElement;
-    const current = localStorage.getItem("theme") || "light";
-    root.setAttribute("data-bs-theme", current);
-    toggle.textContent = current === "light" ? "🌙" : "☀️";
-    toggle.addEventListener("click", () => {
-      const next = root.getAttribute("data-bs-theme") === "light" ? "dark" : "light";
-      root.setAttribute("data-bs-theme", next);
-      localStorage.setItem("theme", next);
-      toggle.textContent = next === "light" ? "🌙" : "☀️";
-    });
-  }
-  
-  // Load charts if on analysis page
-  if (document.getElementById("spiralChart")) {
-    updateCharts();
-  }
-});

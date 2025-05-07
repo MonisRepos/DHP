@@ -1,26 +1,25 @@
-from flask import Flask, jsonify, send_from_directory, request, render_template
-import pandas as pd
 import os
 import json
 import logging
+import pandas as pd
+from flask import Flask, render_template, jsonify, request, send_from_directory
 
-# Configure logging
+# Set up logging
 logging.basicConfig(level=logging.DEBUG)
 
+# Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "weather-analysis-app-secret")
 
-# Load available states and cities from a JSON file
+# Load state and city data from JSON file
 def load_states_and_cities():
     try:
         with open(os.path.join('data', 'india_states.json'), 'r') as f:
-            data = json.load(f)
-        return data
+            return json.load(f)
     except Exception as e:
         logging.error(f"Error loading states and cities: {e}")
-        return {"states": []}
+        return {}
 
-# Get available years from data
+# Get available years from temperature data
 def get_available_years():
     try:
         base = os.path.dirname(__file__)
@@ -32,6 +31,7 @@ def get_available_years():
         logging.error(f"Error getting available years: {e}")
         return []
 
+# Routes
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -46,16 +46,16 @@ def team():
 
 @app.route("/analysis")
 def analysis():
-    # Get available states, cities, and years for dropdowns
+    # Get query parameters for pre-selecting dropdowns
+    selected_state = request.args.get("state", "")
+    selected_city = request.args.get("city", "")
+    selected_year = request.args.get("year", "")
+    
+    # Load available states and cities
     states_and_cities = load_states_and_cities()
     available_years = get_available_years()
     
-    # Set default selections
-    selected_state = request.args.get("state", "Delhi")
-    selected_city = request.args.get("city", "Delhi")
-    selected_year = request.args.get("year", str(available_years[-1]) if available_years else "2022")
-    
-    return render_template("analysis.html", 
+    return render_template("analysis.html",
                           states_and_cities=states_and_cities,
                           available_years=available_years,
                           selected_state=selected_state,

@@ -1,38 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Weather Analysis Dashboard{% endblock %}</title>
-  
-  <!-- Bootstrap - Replit themed CSS -->
-  <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
-  
-  <!-- Font Awesome -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weather Insight Portal</title>
+  <link rel="stylesheet" href="my_project.css">
+  <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Google Fonts - Poppins -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- Chart.js -->
+  <!-- Chart.js for data visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  
-  <!-- D3.js -->
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  
-  <!-- Tippy.js for tooltips -->
-  <script src="https://unpkg.com/@popperjs/core@2"></script>
-  <script src="https://unpkg.com/tippy.js@6"></script>
-  
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  
-  {% block head %}{% endblock %}
+  <!-- Plotly.js for 3D charts -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-  <!-- Header -->
+  <!-- Header with navigation -->
   <header class="main-header">
     <div class="logo">
       <i class="fas fa-cloud-sun-rain"></i>
@@ -42,21 +23,72 @@
       <button id="infoBtn" class="nav-button"><i class="fas fa-info-circle"></i> About Project</button>
       <button id="teamBtn" class="nav-button"><i class="fas fa-users"></i> Our Team</button>
       <button id="homeBtn" class="nav-button"><i class="fas fa-home"></i> Home</button>
-      <button id="themeToggle" class="nav-button">🌙</button>
     </nav>
   </header>
 
-  <!-- Main Content -->
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+  <!-- INTRO SECTION -->
+  <section id="intro" class="intro">
+    <div class="intro-content">
+      <h1>🌦️ 50-Year Weather Analysis</h1>
+      <p class="tagline">Explore long-term climate trends, city-specific weather patterns, and gain actionable insights for research and planning.</p>
+      <div class="features">
+        <div class="feature-item">
+          <i class="fas fa-chart-line"></i>
+          <h3>Historical Trends</h3>
+          <p>Analyze 50 years of weather data to identify long-term patterns</p>
+        </div>
+        <div class="feature-item">
+          <i class="fas fa-map-marked-alt"></i>
+          <h3>Location-Specific</h3>
+          <p>Compare weather patterns across different states and cities in India</p>
+        </div>
+        <div class="feature-item">
+          <i class="fas fa-lightbulb"></i>
+          <h3>Actionable Insights</h3>
+          <p>Make informed decisions based on historical weather data</p>
+        </div>
+      </div>
+      <button id="startBtn" class="cta-button">Get Started <i class="fas fa-arrow-right"></i></button>
+    </div>
+  </section>
 
-  <!-- Footer -->
-  <footer class="main-footer">
-    <p>&copy; 2023 Weather Insights Project | Data sourced from Indian Meteorological Department</p>
-  </footer>
+  <!-- MAIN SECTION (hidden initially) -->
+  <section id="mainContent" class="hidden">
+    <div class="dashboard">
+      <div class="search-container">
+        <h2><i class="fas fa-search-location"></i> Find Weather Data</h2>
+        <div class="dropdown-group">
+          <label for="stateSelect">Select State</label>
+          <select id="stateSelect">
+            <option value="">-- Select State --</option>
+            <!-- States populated by JS -->
+          </select>
+        </div>
 
-  <!-- Project Info Modal -->
+        <div class="dropdown-group">
+          <label for="citySelect">Select City</label>
+          <select id="citySelect" disabled>
+            <option value="">-- First Select a State --</option>
+            <!-- Cities populated by JS after state selection -->
+          </select>
+        </div>
+
+        <button id="searchBtn" class="action-button"><i class="fas fa-search"></i> Search Weather Data</button>
+      </div>
+
+      <div class="graph-section">
+        <h2><i class="fas fa-chart-bar"></i> Weather Insights</h2>
+        <div id="graphArea" class="data-display">
+          <div class="placeholder-content">
+            <i class="fas fa-cloud-sun fa-3x"></i>
+            <p>Select a city to view weather data and insights</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Project Info Modal (hidden initially) -->
   <div id="infoModal" class="modal hidden">
     <div class="modal-content">
       <span class="close-btn">&times;</span>
@@ -94,7 +126,7 @@
     </div>
   </div>
 
-  <!-- Team Members Modal -->
+  <!-- Team Members Modal (hidden initially) -->
   <div id="teamModal" class="modal hidden">
     <div class="modal-content team-modal-content">
       <span class="close-btn">&times;</span>
@@ -108,7 +140,7 @@
         <!-- Team Member 1 -->
         <div class="team-member">
           <div class="member-photo">
-            <img src="{{ url_for('static', filename='img/team_photos/Mani photo.jpg') }}" alt="Mani Kumar">
+            <img src="team_photos/Mani photo.jpg" alt="Mani Kumar">
           </div>
           <div class="member-info">
             <h3>Mani Kumar</h3>
@@ -129,7 +161,7 @@
         <!-- Team Member 2 -->
         <div class="team-member">
           <div class="member-photo">
-            <img src="{{ url_for('static', filename='img/team_photos/monish_photo.jpg') }}" alt="Monish">
+            <img src="team_photos/monish_photo.jpg" alt="Monish">
           </div>
           <div class="member-info">
             <h3>Monish</h3>
@@ -150,10 +182,10 @@
         <!-- Team Member 3 -->
         <div class="team-member">
           <div class="member-photo">
-            <img src="{{ url_for('static', filename='img/team_photos/Ravi_photo.jpg') }}" alt="Ravi Maurya">
+            <img src="team_photos/Ravi_photo.jpg" alt="Ravi Mauriya">
           </div>
           <div class="member-info">
-            <h3>Ravi Maurya</h3>
+            <h3>Ravi Mauriya</h3>
             <p class="member-role">Data Scraper & Data Engineer</p>
             <p class="member-description">Ravi collected and processed the 50-year weather data from various sources. In the presentation, he will explain the data collection methodology, how the CSV files are structured and cleaned, and the techniques used to ensure data accuracy and completeness.</p>
             <div class="presentation-points">
@@ -175,9 +207,15 @@
     </div>
   </div>
 
-  <!-- JavaScript Files -->
-  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-  {% block scripts %}{% endblock %}
+  <footer class="main-footer">
+    <p>&copy; 2023 Weather Insights Project | Data sourced from Indian Meteorological Department</p>
+  </footer>
+
+  <!-- Load charts.js first since my_weather_project.js depends on it -->
+  <script src="charts.js"></script>
+  <script src="my_weather_project.js"></script>
+
+  <!-- Load the fix script to ensure the search button works -->
+  <script src="fix_search_button.js"></script>
 </body>
 </html>
