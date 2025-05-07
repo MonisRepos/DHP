@@ -130,17 +130,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(years => {
                 graphArea.innerHTML = '';
                 
-                // Create year filter
-                const yearFilterContainer = document.createElement('div');
-                yearFilterContainer.className = 'year-filter mb-3';
-                yearFilterContainer.innerHTML = `
-                    <label for="yearFilter">Filter by Year:</label>
-                    <select id="yearFilter" class="form-control">
-                        <option value="">All Years</option>
-                        ${years.map(year => `<option value="${year}">${year}</option>`).join('')}
-                    </select>
-                `;
-                graphArea.appendChild(yearFilterContainer);
+                // No year filter in main dashboard as per user requirements
                 
                 // Create chart containers
                 const chartsContainer = document.createElement('div');
@@ -163,11 +153,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Load data and render charts
                 fetchTemperatureData(selectedState, selectedCity);
-                
-                // Add event listener for year filter
-                document.getElementById('yearFilter').addEventListener('change', function() {
-                    fetchTemperatureData(selectedState, selectedCity, this.value);
-                });
             })
             .catch(error => {
                 console.error('Error loading years:', error);

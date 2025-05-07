@@ -18,13 +18,438 @@ function initInsightsCharts() {
       // Initialize each chart with the data
       renderTempIncreaseChart(tempData);
       renderHotDaysChart(tempData);
-      renderUrbanRuralChart(tempData);
+      renderSeasonalShiftChart(tempData);
       renderRegionalVariationChart(tempData);
-      renderInsightSpiral(tempData);
     })
     .catch(error => {
       console.error('Error fetching insight data:', error);
     });
+}
+
+// Function to initialize visualization charts
+function initVisualizations() {
+  // Fetch temperature data from API
+  fetch('/api/temperature')
+    .then(response => response.json())
+    .then(data => {
+      // Parse the data
+      const tempData = data.map(d => ({
+        year: +d.Year,
+        month: +d.Month,
+        temperature: +d["Temperature (°C)"],
+        minTemp: +d.Min_Temp_C,
+        maxTemp: +d.Max_Temp_C
+      }));
+      
+      // Initialize the spiral chart
+      renderInsightSpiral(tempData);
+      
+      // Initialize the heatmap
+      renderVizHeatmap(tempData);
+      
+      // Initialize the bar chart race
+      renderVizBarChartRace(tempData);
+      
+      // Initialize city comparison form
+      initCityComparisonForm();
+    })
+    .catch(error => {
+      console.error('Error fetching visualization data:', error);
+    });
+}
+
+// City comparison functionality
+function initCityComparisonForm() {
+  // Load states for the city comparison dropdowns
+  fetch('/api/states')
+    .then(response => response.json())
+    .then(data => {
+      // Populate state dropdowns
+      const stateSelects = [
+        document.getElementById('firstCityState'),
+        document.getElementById('secondCityState')
+      ];
+      
+      stateSelects.forEach(select => {
+        select.innerHTML = '<option value="">-- Select State --</option>';
+        Object.keys(data).sort().forEach(state => {
+          const option = document.createElement('option');
+          option.value = state;
+          option.textContent = state;
+          select.appendChild(option);
+        });
+      });
+      
+      // Add event listeners to state dropdowns
+      stateSelects.forEach((select, index) => {
+        const citySelect = index === 0 ? 
+          document.getElementById('firstCity') : 
+          document.getElementById('secondCity');
+        
+        select.addEventListener('change', function() {
+          const selectedState = this.value;
+          citySelect.innerHTML = '<option value="">-- Select City --</option>';
+          
+          if (selectedState) {
+            citySelect.disabled = false;
+            const cities = data[selectedState] || [];
+            cities.sort().forEach(city => {
+              const option = document.createElement('option');
+              option.value = city;
+              option.textContent = city;
+              citySelect.appendChild(option);
+            });
+          } else {
+            citySelect.disabled = true;
+          }
+        });
+      });
+      
+      // Load years for the comparison
+      fetch('/api/years')
+        .then(response => response.json())
+        .then(years => {
+          const yearSelect = document.getElementById('comparisonYear');
+          yearSelect.innerHTML = '<option value="">All Years</option>';
+          years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
+          });
+        })
+        .catch(error => console.error('Error loading years:', error));
+      
+      // Add event listener to compare button
+      document.getElementById('compareBtn').addEventListener('click', function() {
+        const firstState = document.getElementById('firstCityState').value;
+        const firstCity = document.getElementById('firstCity').value;
+        const secondState = document.getElementById('secondCityState').value;
+        const secondCity = document.getElementById('secondCity').value;
+        const year = document.getElementById('comparisonYear').value;
+        
+        if (!firstState || !firstCity || !secondState || !secondCity) {
+          alert('Please select both cities to compare');
+          return;
+        }
+        
+        compareCities(firstState, firstCity, secondState, secondCity, year);
+      });
+    })
+    .catch(error => console.error('Error loading states:', error));
+}
+
+// Function to compare two cities
+function compareCities(firstState, firstCity, secondState, secondCity, year) {
+  // Show loading indicator
+  const loader = document.getElementById('loader');
+  loader.style.display = 'flex';
+  
+  // Fetch data for both cities
+  Promise.all([
+    fetch(`/api/temperature?state=${encodeURIComponent(firstState)}&city=${encodeURIComponent(firstCity)}${year ? `&year=${year}` : ''}`).then(res => res.json()),
+    fetch(`/api/temperature?state=${encodeURIComponent(secondState)}&city=${encodeURIComponent(secondCity)}${year ? `&year=${year}` : ''}`).then(res => res.json())
+  ])
+  .then(([firstCityData, secondCityData]) => {
+    // Hide loader
+    loader.style.display = 'none';
+    
+    // Parse data
+    const parsedFirstCity = firstCityData.map(d => ({
+      year: +d.Year,
+      month: +d.Month,
+      temperature: +d["Temperature (°C)"],
+      minTemp: +d.Min_Temp_C,
+      maxTemp: +d.Max_Temp_C
+    }));
+    
+    const parsedSecondCity = secondCityData.map(d => ({
+      year: +d.Year,
+      month: +d.Month,
+      temperature: +d["Temperature (°C)"],
+      minTemp: +d.Min_Temp_C,
+      maxTemp: +d.Max_Temp_C
+    }));
+    
+    // Render comparison charts
+    renderCityComparisonChart(parsedFirstCity, parsedSecondCity, firstCity, secondCity, year);
+    renderTemperatureRangeChart(parsedFirstCity, parsedSecondCity, firstCity, secondCity, year);
+  })
+  .catch(error => {
+    console.error('Error comparing cities:', error);
+    loader.style.display = 'none';
+    alert('Error fetching data for city comparison');
+  });
+}
+
+// Render city comparison chart
+function renderCityComparisonChart(firstCityData, secondCityData, firstCity, secondCity, year) {
+  // Calculate monthly averages for both cities
+  const monthlyAvgFirst = calculateMonthlyAverages(firstCityData);
+  const monthlyAvgSecond = calculateMonthlyAverages(secondCityData);
+  
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Get context and destroy existing chart if it exists
+  const ctx = document.getElementById('cityComparisonChart').getContext('2d');
+  if (window.cityCompChart) window.cityCompChart.destroy();
+  
+  // Create new chart
+  window.cityCompChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: monthNames,
+      datasets: [
+        {
+          label: firstCity,
+          data: monthlyAvgFirst,
+          borderColor: '#3498db',
+          backgroundColor: 'rgba(52, 152, 219, 0.1)',
+          tension: 0.3,
+          fill: true
+        },
+        {
+          label: secondCity,
+          data: monthlyAvgSecond,
+          borderColor: '#e74c3c',
+          backgroundColor: 'rgba(231, 76, 60, 0.1)',
+          tension: 0.3,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: year ? `Monthly Temperature Comparison (${year})` : 'Monthly Temperature Comparison (All Years)'
+        }
+      },
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'Average Temperature (°C)'
+          }
+        }
+      }
+    }
+  });
+}
+
+// Render temperature range chart
+function renderTemperatureRangeChart(firstCityData, secondCityData, firstCity, secondCity, year) {
+  // Calculate temperature range data
+  const firstCityRanges = calculateTempRanges(firstCityData);
+  const secondCityRanges = calculateTempRanges(secondCityData);
+  
+  // Get context and destroy existing chart if it exists
+  const ctx = document.getElementById('temperatureRangeChart').getContext('2d');
+  if (window.tempRangeChart) window.tempRangeChart.destroy();
+  
+  // Create new chart - stacked bar chart
+  window.tempRangeChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: [firstCity, secondCity],
+      datasets: [
+        {
+          label: 'Minimum Temperature (°C)',
+          data: [firstCityRanges.minTemp, secondCityRanges.minTemp],
+          backgroundColor: '#3498db'
+        },
+        {
+          label: 'Average Temperature (°C)',
+          data: [firstCityRanges.avgTemp, secondCityRanges.avgTemp],
+          backgroundColor: '#2ecc71'
+        },
+        {
+          label: 'Maximum Temperature (°C)',
+          data: [firstCityRanges.maxTemp, secondCityRanges.maxTemp],
+          backgroundColor: '#e74c3c'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: year ? `Temperature Range Comparison (${year})` : 'Temperature Range Comparison (All Years)'
+        }
+      },
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'Temperature (°C)'
+          }
+        }
+      }
+    }
+  });
+}
+
+// Helper function to calculate monthly averages
+function calculateMonthlyAverages(data) {
+  const monthlySums = Array(12).fill(0);
+  const monthlyCounts = Array(12).fill(0);
+  
+  data.forEach(d => {
+    if (d.month >= 1 && d.month <= 12) {
+      monthlySums[d.month - 1] += d.temperature;
+      monthlyCounts[d.month - 1]++;
+    }
+  });
+  
+  return monthlySums.map((sum, i) => 
+    monthlyCounts[i] > 0 ? sum / monthlyCounts[i] : null
+  );
+}
+
+// Helper function to calculate temperature ranges
+function calculateTempRanges(data) {
+  let sumTemp = 0;
+  let count = 0;
+  let minTemp = Infinity;
+  let maxTemp = -Infinity;
+  
+  data.forEach(d => {
+    sumTemp += d.temperature;
+    count++;
+    minTemp = Math.min(minTemp, d.minTemp);
+    maxTemp = Math.max(maxTemp, d.maxTemp);
+  });
+  
+  return {
+    avgTemp: count > 0 ? sumTemp / count : null,
+    minTemp: minTemp !== Infinity ? minTemp : null,
+    maxTemp: maxTemp !== -Infinity ? maxTemp : null
+  };
+}
+
+// Additional visualization functions
+function renderVizHeatmap(data) {
+  // Set up SVG and dimensions
+  const svg = d3.select("#vizHeatmapChart");
+  svg.selectAll("*").remove(); // Clear any existing content
+  
+  const width = +svg.attr("width");
+  const height = +svg.attr("height");
+  const margin = {top: 30, right: 10, bottom: 40, left: 60};
+  const innerWidth = width - margin.left - margin.right;
+  const innerHeight = height - margin.top - margin.bottom;
+  
+  const g = svg.append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+  
+  // Get unique years and set up scales
+  const years = [...new Set(data.map(d => d.year))].sort((a, b) => a - b);
+  const months = d3.range(1, 13);
+  
+  const x = d3.scaleBand()
+    .domain(years)
+    .range([0, innerWidth])
+    .padding(0.01);
+  
+  const y = d3.scaleBand()
+    .domain(months)
+    .range([0, innerHeight])
+    .padding(0.01);
+  
+  // Get extent for color scale
+  const extent = d3.extent(data, d => d.temperature);
+  const colorScale = d3.scaleSequential(d3.interpolateInferno)
+    .domain([extent[1], extent[0]]);
+  
+  // Draw cells
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  const cells = g.selectAll("rect")
+    .data(data)
+    .enter()
+    .append("rect")
+    .attr("x", d => x(d.year))
+    .attr("y", d => y(d.month))
+    .attr("width", x.bandwidth())
+    .attr("height", y.bandwidth())
+    .attr("fill", d => colorScale(d.temperature))
+    .attr("data-tippy-content", d => `${monthNames[d.month-1]} ${d.year}: ${d.temperature.toFixed(1)}°C`);
+  
+  // Add tooltips
+  tippy(cells.nodes(), { theme: 'light-border', animation: 'scale' });
+  
+  // Add axes
+  g.append("g")
+    .attr("transform", `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(x).tickValues(years.filter((_, i) => i % 5 === 0)));
+  
+  g.append("g")
+    .call(d3.axisLeft(y).tickFormat(d => monthNames[d-1]));
+  
+  // Add title
+  svg.append("text")
+    .attr("x", width / 2)
+    .attr("y", margin.top / 2)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "16px")
+    .text("Heatmap of Average Monthly Temperature");
+}
+
+function renderVizBarChartRace(data) {
+  // Get unique years and set up the chart
+  const years = [...new Set(data.map(d => d.year))].sort((a, b) => a - b);
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  // Get the canvas context
+  const ctx = document.getElementById("vizBarRaceChart").getContext("2d");
+  
+  // Destroy existing chart if it exists
+  if (window.vizRaceChart) window.vizRaceChart.destroy();
+  
+  // Get initial data
+  const initialYear = years[0];
+  const initialData = data.filter(d => d.year === initialYear);
+  
+  // Create the chart
+  window.vizRaceChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: initialData.map(d => monthNames[d.month - 1]),
+      datasets: [{
+        label: `Year ${initialYear}`,
+        data: initialData.map(d => d.temperature),
+        backgroundColor: "#2c3e50"
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      animation: { duration: 800 },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Temperature (°C)'
+          }
+        }
+      }
+    }
+  });
+  
+  // Set up animation
+  let yearIndex = 0;
+  setInterval(() => {
+    yearIndex = (yearIndex + 1) % years.length;
+    const year = years[yearIndex];
+    const yearData = data.filter(d => d.year === year);
+    
+    window.vizRaceChart.data.labels = yearData.map(d => monthNames[d.month - 1]);
+    window.vizRaceChart.data.datasets[0].label = `Year ${year}`;
+    window.vizRaceChart.data.datasets[0].data = yearData.map(d => d.temperature);
+    window.vizRaceChart.update();
+  }, 2000);
 }
 
 // Chart 1: Temperature Increase over decades
@@ -143,34 +568,57 @@ function renderHotDaysChart(data) {
   });
 }
 
-// Chart 3: Urban vs Rural Warming
-function renderUrbanRuralChart(data) {
-  // Simulated urban vs rural data based on our temperature dataset
-  // In a real scenario, this would come from comparing actual urban and rural stations
-  const urbanData = [23.2, 23.5, 24.1, 24.6, 25.2, 25.9];
-  const ruralData = [22.8, 22.9, 23.2, 23.5, 23.9, 24.2];
-  const decades = ['1970s', '1980s', '1990s', '2000s', '2010s', '2020s'];
+// Chart 3: Seasonal Temperature Shift
+function renderSeasonalShiftChart(data) {
+  // Group data by decade and month
+  const decadeData = {};
+  data.forEach(d => {
+    const decade = Math.floor(d.year / 10) * 10;
+    if (!decadeData[decade]) {
+      decadeData[decade] = Array(12).fill({ sum: 0, count: 0 });
+    }
+    
+    // Create a new object to avoid reference issues
+    const monthData = { ...decadeData[decade][d.month - 1] };
+    monthData.sum += d.temperature;
+    monthData.count += 1;
+    decadeData[decade][d.month - 1] = monthData;
+  });
   
-  const ctx = document.getElementById('urbanRuralChart').getContext('2d');
+  // Calculate average temperatures by month for each decade
+  const decades = Object.keys(decadeData).sort();
+  const monthlyAverages = {};
+  
+  decades.forEach(decade => {
+    monthlyAverages[decade] = decadeData[decade].map(d => 
+      d.count > 0 ? d.sum / d.count : null
+    );
+  });
+  
+  // Get the earliest and latest decades for comparison
+  const earliestDecade = decades[0];
+  const latestDecade = decades[decades.length - 1];
+  
+  const ctx = document.getElementById('seasonalShiftChart').getContext('2d');
   new Chart(ctx, {
     type: 'line',
     data: {
-      labels: decades,
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
       datasets: [
         {
-          label: 'Urban Areas',
-          data: urbanData,
-          borderColor: 'rgba(255, 99, 132, 1)',
-          backgroundColor: 'rgba(255, 99, 132, 0.1)',
+          label: `${earliestDecade}s`,
+          data: monthlyAverages[earliestDecade],
+          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(54, 162, 235, 0.1)',
           borderWidth: 2,
           tension: 0.3,
           fill: true
         },
         {
-          label: 'Rural Areas',
-          data: ruralData,
-          borderColor: 'rgba(54, 162, 235, 1)',
-          backgroundColor: 'rgba(54, 162, 235, 0.1)',
+          label: `${latestDecade}s`,
+          data: monthlyAverages[latestDecade],
+          borderColor: 'rgba(255, 99, 132, 1)',
+          backgroundColor: 'rgba(255, 99, 132, 0.1)',
           borderWidth: 2,
           tension: 0.3,
           fill: true
