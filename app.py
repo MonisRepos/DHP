@@ -50,35 +50,109 @@ def analysis():
 
 @app.route("/api/temperature")
 def api_temperature():
-    base = os.path.dirname(__file__)
-    csv_path = os.path.join(base, "data", "delhi_temperature.csv")
-    
     try:
-        df = pd.read_csv(csv_path)
-        
-        # Rename columns to match what the frontend expects
-        df = df.rename(columns={
-            'Avg_Temp_C': 'Temperature (°C)',
-            'Max_Temp_C': 'Max_Temp_C',
-            'Min_Temp_C': 'Min_Temp_C'
-        })
-        
-        # Filter data based on query parameters
+        # Get query parameters
         state = request.args.get("state")
         city = request.args.get("city")
         year = request.args.get("year")
         month = request.args.get("month")
+        day_level = request.args.get("day_level", "false").lower() == "true"
         
-        # Note: In a real app, we would filter based on state and city
-        # For now, we're just using delhi_temperature.csv for all cases
-        
-        if year:
-            df = df[df['Year'] == int(year)]
-        if month:
-            df = df[df['Month'] == int(month)]
+        # If day-level data is requested, use the daywise data files
+        if day_level:
+            if not city:
+                # If no city is specified, default to Delhi (Safdarjung)
+                city = "Safdarjung"
+                
+            # Path to the city's daywise data file
+            base = os.path.dirname(__file__)
+            csv_path = os.path.join(base, "data", "daywise_data", f"{city}.csv")
             
-        # Return data as JSON
-        return jsonify(df.to_dict(orient="records"))
+            if not os.path.exists(csv_path):
+                logging.error(f"Day-level data not found for city: {city}")
+                return jsonify({"error": f"Day-level data not available for {city}"}), 404
+                
+            # Read the CSV file
+            df = pd.read_csv(csv_path)
+            
+            # Parse the date column to extract year, month, day
+            df['DATE'] = pd.to_datetime(df['DATE'])
+            df['Year'] = df['DATE'].dt.year
+            df['Month'] = df['DATE'].dt.month
+            df['Day'] = df['DATE'].dt.day
+            
+            # Rename columns to match frontend expectations
+            df = df.rename(columns={
+                'TEMP': 'Temperature (°C)',
+                'MAX': 'Max_Temp_C',
+                'MIN': 'Min_Temp_C'
+            })
+            
+            # Filter based on year and month if provided
+            if year:
+                df = df[df['Year'] == int(year)]
+            if month:
+                df = df[df['Month'] == int(month)]
+                
+            # Return results
+            return jsonify(df.to_dict(orient="records"))
+        else:
+            # For monthly data, determine which file to use based on city
+            if city:
+                # Check if we have daywise data for this city
+                base = os.path.dirname(__file__)
+                daywise_path = os.path.join(base, "data", "daywise_data", f"{city}.csv")
+                
+                if os.path.exists(daywise_path):
+                    # Load the daywise data and aggregate by month
+                    df = pd.read_csv(daywise_path)
+                    df['DATE'] = pd.to_datetime(df['DATE'])
+                    df['Year'] = df['DATE'].dt.year
+                    df['Month'] = df['DATE'].dt.month
+                    
+                    # Group by year and month to get monthly averages
+                    monthly_df = df.groupby(['Year', 'Month']).agg({
+                        'TEMP': 'mean',
+                        'MAX': 'max',
+                        'MIN': 'min'
+                    }).reset_index()
+                    
+                    # Rename columns
+                    monthly_df = monthly_df.rename(columns={
+                        'TEMP': 'Temperature (°C)',
+                        'MAX': 'Max_Temp_C',
+                        'MIN': 'Min_Temp_C'
+                    })
+                    
+                    # Filter based on year and month if provided
+                    if year:
+                        monthly_df = monthly_df[monthly_df['Year'] == int(year)]
+                    if month:
+                        monthly_df = monthly_df[monthly_df['Month'] == int(month)]
+                        
+                    return jsonify(monthly_df.to_dict(orient="records"))
+                else:
+                    # Fall back to Delhi data if city not found
+                    logging.warning(f"Data not found for {city}, using Delhi data instead")
+            
+            # If no specific city or data not found, use the default Delhi data
+            csv_path = os.path.join(os.path.dirname(__file__), "data", "delhi_temperature.csv")
+            df = pd.read_csv(csv_path)
+            
+            # Rename columns
+            df = df.rename(columns={
+                'Avg_Temp_C': 'Temperature (°C)',
+                'Max_Temp_C': 'Max_Temp_C',
+                'Min_Temp_C': 'Min_Temp_C'
+            })
+            
+            # Filter based on parameters
+            if year:
+                df = df[df['Year'] == int(year)]
+            if month:
+                df = df[df['Month'] == int(month)]
+                
+            return jsonify(df.to_dict(orient="records"))
     except Exception as e:
         logging.error(f"Error processing temperature data: {e}")
         return jsonify({"error": str(e)}), 500
