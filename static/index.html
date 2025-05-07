@@ -68,10 +68,16 @@
             <p>Make informed decisions based on historical weather data</p>
           </div>
         </div>
-        <div class="cta-buttons">
-          <button id="startBtn" class="cta-button">Get Started <i class="fas fa-arrow-right"></i></button>
-          <button id="insightsBtn" class="cta-button" style="background-color: var(--secondary); margin-left: 20px;">Key Insights <i class="fas fa-search"></i></button>
-          <button id="visualizationsBtn" class="cta-button" style="background-color: var(--accent); margin-left: 20px;">Visualizations <i class="fas fa-chart-pie"></i></button>
+        <div class="cta-buttons" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 30px;">
+          <button id="startBtn" class="cta-button" style="min-width: 200px;">
+            <i class="fas fa-arrow-right"></i> Get Started
+          </button>
+          <button id="visualizationsBtn" class="cta-button" style="min-width: 200px; background-color: var(--accent);">
+            <i class="fas fa-chart-pie"></i> Visualizations
+          </button>
+          <button id="insightsBtn" class="cta-button" style="min-width: 200px; background-color: var(--secondary);">
+            <i class="fas fa-search"></i> Key Insights
+          </button>
         </div>
       </div>
     </section>
@@ -310,69 +316,122 @@
           </div>
         </div>
         
-        <!-- City Comparison Tool -->
+        <!-- Enhanced Multi-City Comparison Tool -->
         <div class="city-comparison" style="margin-top: 30px; padding: 20px; background-color: var(--subtle); border-radius: var(--border-radius);">
-          <h3><i class="fas fa-exchange-alt"></i> City Temperature Comparison</h3>
+          <h3><i class="fas fa-exchange-alt"></i> Multi-City Temperature Comparison</h3>
           
-          <div class="comparison-selectors" style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">
-            <div class="city-selector" style="flex: 1; min-width: 250px;">
-              <h4>First City</h4>
-              <div class="form-group mb-2">
-                <label for="firstCityState">State:</label>
-                <select id="firstCityState" class="form-control">
-                  <option value="">-- Select State --</option>
-                  <!-- States populated by JS -->
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="firstCity">City:</label>
-                <select id="firstCity" class="form-control" disabled>
-                  <option value="">-- First Select a State --</option>
-                  <!-- Cities populated by JS -->
-                </select>
-              </div>
-            </div>
-            
-            <div class="city-selector" style="flex: 1; min-width: 250px;">
-              <h4>Second City</h4>
-              <div class="form-group mb-2">
-                <label for="secondCityState">State:</label>
-                <select id="secondCityState" class="form-control">
-                  <option value="">-- Select State --</option>
-                  <!-- States populated by JS -->
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="secondCity">City:</label>
-                <select id="secondCity" class="form-control" disabled>
-                  <option value="">-- First Select a State --</option>
-                  <!-- Cities populated by JS -->
-                </select>
-              </div>
-            </div>
-            
-            <div class="year-selector" style="flex: 1; min-width: 250px;">
-              <h4>Time Period</h4>
-              <div class="form-group">
-                <label for="comparisonYear">Year (optional):</label>
+          <div class="filter-container" style="background-color: var(--background); padding: 15px; border-radius: var(--border-radius); margin-top: 20px;">
+            <div class="time-period-filter" style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 15px;">
+              <div class="form-group" style="flex: 1; min-width: 200px;">
+                <label for="comparisonYear"><i class="fas fa-calendar-alt"></i> Select Year:</label>
                 <select id="comparisonYear" class="form-control">
                   <option value="">All Years</option>
                   <!-- Years populated by JS -->
                 </select>
               </div>
-              <button id="compareBtn" class="btn btn-primary mt-4" style="width: 100%;">Compare Cities</button>
+              
+              <div class="form-group" style="flex: 1; min-width: 200px;">
+                <label for="comparisonMonth"><i class="fas fa-calendar-day"></i> Select Month:</label>
+                <select id="comparisonMonth" class="form-control">
+                  <option value="">All Months</option>
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </div>
             </div>
           </div>
           
-          <div id="comparisonResults" style="margin-top: 30px;">
+          <!-- City Selection Area -->
+          <div id="citySelectionArea" style="margin-top: 20px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h4><i class="fas fa-map-marker-alt"></i> Select Cities to Compare</h4>
+              <button id="addCityBtn" class="btn btn-sm btn-primary">
+                <i class="fas fa-plus"></i> Add Another City
+              </button>
+            </div>
+            
+            <div id="citySelectors" class="city-selector-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+              <!-- City 1 -->
+              <div class="city-selector city-card" data-city-index="1" style="background-color: var(--background); padding: 15px; border-radius: var(--border-radius);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h5>City 1</h5>
+                  <span class="remove-city" style="cursor: pointer; display: none;"><i class="fas fa-times"></i></span>
+                </div>
+                <div class="form-group mb-2">
+                  <label for="cityState-1">State:</label>
+                  <select id="cityState-1" class="form-control city-state-select">
+                    <option value="">-- Select State --</option>
+                    <!-- States populated by JS -->
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="cityName-1">City:</label>
+                  <select id="cityName-1" class="form-control city-name-select" disabled>
+                    <option value="">-- First Select a State --</option>
+                    <!-- Cities populated by JS -->
+                  </select>
+                </div>
+              </div>
+              
+              <!-- City 2 -->
+              <div class="city-selector city-card" data-city-index="2" style="background-color: var(--background); padding: 15px; border-radius: var(--border-radius);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h5>City 2</h5>
+                  <span class="remove-city" style="cursor: pointer; display: none;"><i class="fas fa-times"></i></span>
+                </div>
+                <div class="form-group mb-2">
+                  <label for="cityState-2">State:</label>
+                  <select id="cityState-2" class="form-control city-state-select">
+                    <option value="">-- Select State --</option>
+                    <!-- States populated by JS -->
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="cityName-2">City:</label>
+                  <select id="cityName-2" class="form-control city-name-select" disabled>
+                    <option value="">-- First Select a State --</option>
+                    <!-- Cities populated by JS -->
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <div class="text-center mt-4">
+              <button id="compareBtn" class="btn btn-lg btn-primary">
+                <i class="fas fa-chart-line"></i> Compare Cities
+              </button>
+            </div>
+          </div>
+          
+          <!-- Results Area -->
+          <div id="comparisonResults" style="margin-top: 30px; display: none;">
+            <h4 class="mb-3"><i class="fas fa-chart-bar"></i> Comparison Results</h4>
+            
             <div class="comparison-charts" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
               <div class="chart-container" style="background-color: var(--background); padding: 20px; border-radius: var(--border-radius);">
-                <h4 class="text-center">Monthly Average Temperature Comparison</h4>
+                <h5 class="text-center">Monthly Average Temperature</h5>
                 <canvas id="cityComparisonChart" height="300"></canvas>
               </div>
               <div class="chart-container" style="background-color: var(--background); padding: 20px; border-radius: var(--border-radius);">
-                <h4 class="text-center">Temperature Range Comparison</h4>
+                <h5 class="text-center">Temperature Range</h5>
                 <canvas id="temperatureRangeChart" height="300"></canvas>
+              </div>
+            </div>
+            
+            <div class="additional-charts mt-4">
+              <div class="chart-container" style="background-color: var(--background); padding: 20px; border-radius: var(--border-radius);">
+                <h5 class="text-center">Year-over-Year Temperature Trends</h5>
+                <canvas id="yearlyTrendsChart" height="300"></canvas>
               </div>
             </div>
           </div>

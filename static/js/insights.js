@@ -58,237 +58,592 @@ function initVisualizations() {
     });
 }
 
-// City comparison functionality
+// Enhanced Multi-City Comparison Functionality
 function initCityComparisonForm() {
-  // Load states for the city comparison dropdowns
-  fetch('/api/states')
-    .then(response => response.json())
-    .then(data => {
-      // Populate state dropdowns
-      const stateSelects = [
-        document.getElementById('firstCityState'),
-        document.getElementById('secondCityState')
-      ];
+  // Global variables
+  let cityCounter = 2; // Start with 2 cities
+  const maxCities = 6;  // Maximum number of cities to compare
+  let statesData = {}; // Store states data globally
+  let cityData = {}; // Store fetched city data
+  
+  // Show loading indicator initially
+  const loader = document.getElementById('loader');
+  
+  // Load states and years data
+  Promise.all([
+    fetch('/api/states').then(res => res.json()),
+    fetch('/api/years').then(res => res.json())
+  ])
+  .then(([states, years]) => {
+    // Store states data in global variable
+    statesData = states;
+    
+    // Populate year dropdown
+    const yearSelect = document.getElementById('comparisonYear');
+    yearSelect.innerHTML = '<option value="">All Years</option>';
+    years.sort((a, b) => b - a).forEach(year => {
+      const option = document.createElement('option');
+      option.value = year;
+      option.textContent = year;
+      yearSelect.appendChild(option);
+    });
+    
+    // Set up state/city selectors for initial cities
+    setupStateSelectors();
+    
+    // Setup event handlers
+    setupEventHandlers();
+  })
+  .catch(error => {
+    console.error('Error initializing city comparison form:', error);
+    alert('Failed to load location data. Please try again later.');
+  });
+  
+  // Function to set up state selectors for all cities
+  function setupStateSelectors() {
+    // Get all state selects
+    const stateSelects = document.querySelectorAll('.city-state-select');
+    
+    // Populate state dropdowns
+    stateSelects.forEach(select => {
+      // Clear existing options and add default
+      select.innerHTML = '<option value="">-- Select State --</option>';
       
-      stateSelects.forEach(select => {
-        select.innerHTML = '<option value="">-- Select State --</option>';
-        Object.keys(data).sort().forEach(state => {
-          const option = document.createElement('option');
-          option.value = state;
-          option.textContent = state;
-          select.appendChild(option);
-        });
+      // Add all states
+      Object.keys(statesData).sort().forEach(state => {
+        const option = document.createElement('option');
+        option.value = state;
+        option.textContent = state;
+        select.appendChild(option);
       });
       
-      // Add event listeners to state dropdowns
-      stateSelects.forEach((select, index) => {
-        const citySelect = index === 0 ? 
-          document.getElementById('firstCity') : 
-          document.getElementById('secondCity');
+      // Add change event listener
+      select.addEventListener('change', handleStateChange);
+    });
+    
+    // Add event listeners for remove buttons
+    document.querySelectorAll('.remove-city').forEach(button => {
+      button.addEventListener('click', handleRemoveCity);
+      
+      // Show remove buttons if we have more than 2 cities
+      if (document.querySelectorAll('.city-selector').length > 2) {
+        button.style.display = 'block';
+      }
+    });
+  }
+  
+  // Handle state selection change
+  function handleStateChange() {
+    const stateSelect = this;
+    const cityIndex = stateSelect.closest('.city-selector').dataset.cityIndex;
+    const citySelect = document.getElementById(`cityName-${cityIndex}`);
+    
+    // Reset city dropdown
+    citySelect.innerHTML = '<option value="">-- Select City --</option>';
+    
+    const selectedState = stateSelect.value;
+    if (selectedState) {
+      // Enable city dropdown and populate with cities for the selected state
+      citySelect.disabled = false;
+      
+      const cities = statesData[selectedState] || [];
+      cities.sort().forEach(city => {
+        const option = document.createElement('option');
+        option.value = city;
+        option.textContent = city;
+        citySelect.appendChild(option);
+      });
+    } else {
+      // Disable city dropdown if no state is selected
+      citySelect.disabled = true;
+    }
+  }
+  
+  // Handle removing a city
+  function handleRemoveCity() {
+    const cityCard = this.closest('.city-selector');
+    
+    // Only allow removal if we have more than 2 cities
+    if (document.querySelectorAll('.city-selector').length > 2) {
+      cityCard.remove();
+      
+      // Hide remove buttons if we're back to only 2 cities
+      if (document.querySelectorAll('.city-selector').length <= 2) {
+        document.querySelectorAll('.remove-city').forEach(btn => {
+          btn.style.display = 'none';
+        });
+      }
+    }
+  }
+  
+  // Setup all event handlers
+  function setupEventHandlers() {
+    // Add City button
+    document.getElementById('addCityBtn').addEventListener('click', function() {
+      if (document.querySelectorAll('.city-selector').length >= maxCities) {
+        alert(`Maximum ${maxCities} cities can be compared at once.`);
+        return;
+      }
+      
+      // Increment counter
+      cityCounter++;
+      
+      // Create new city selector
+      const citySelectors = document.getElementById('citySelectors');
+      const newCityCard = document.createElement('div');
+      newCityCard.className = 'city-selector city-card';
+      newCityCard.dataset.cityIndex = cityCounter;
+      newCityCard.style.backgroundColor = 'var(--background)';
+      newCityCard.style.padding = '15px';
+      newCityCard.style.borderRadius = 'var(--border-radius)';
+      
+      newCityCard.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5>City ${cityCounter}</h5>
+          <span class="remove-city" style="cursor: pointer;"><i class="fas fa-times"></i></span>
+        </div>
+        <div class="form-group mb-2">
+          <label for="cityState-${cityCounter}">State:</label>
+          <select id="cityState-${cityCounter}" class="form-control city-state-select">
+            <option value="">-- Select State --</option>
+            <!-- Will be populated by JS -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cityName-${cityCounter}">City:</label>
+          <select id="cityName-${cityCounter}" class="form-control city-name-select" disabled>
+            <option value="">-- First Select a State --</option>
+            <!-- Will be populated after state selection -->
+          </select>
+        </div>
+      `;
+      
+      citySelectors.appendChild(newCityCard);
+      
+      // Setup selectors for the new city
+      const newStateSelect = document.getElementById(`cityState-${cityCounter}`);
+      
+      // Populate states
+      Object.keys(statesData).sort().forEach(state => {
+        const option = document.createElement('option');
+        option.value = state;
+        option.textContent = state;
+        newStateSelect.appendChild(option);
+      });
+      
+      // Add event listeners
+      newStateSelect.addEventListener('change', handleStateChange);
+      newCityCard.querySelector('.remove-city').addEventListener('click', handleRemoveCity);
+      
+      // Show all remove buttons
+      document.querySelectorAll('.remove-city').forEach(btn => {
+        btn.style.display = 'block';
+      });
+    });
+    
+    // Compare button
+    document.getElementById('compareBtn').addEventListener('click', function() {
+      // Get all selected cities
+      const selectedCities = [];
+      const cityCards = document.querySelectorAll('.city-selector');
+      
+      cityCards.forEach(card => {
+        const index = card.dataset.cityIndex;
+        const state = document.getElementById(`cityState-${index}`).value;
+        const city = document.getElementById(`cityName-${index}`).value;
         
-        select.addEventListener('change', function() {
-          const selectedState = this.value;
-          citySelect.innerHTML = '<option value="">-- Select City --</option>';
+        if (state && city) {
+          selectedCities.push({ state, city, index });
+        }
+      });
+      
+      // Need at least 2 cities for comparison
+      if (selectedCities.length < 2) {
+        alert('Please select at least 2 cities to compare');
+        return;
+      }
+      
+      // Get selected year and month
+      const year = document.getElementById('comparisonYear').value;
+      const month = document.getElementById('comparisonMonth').value;
+      
+      // Compare cities
+      compareMultipleCities(selectedCities, year, month);
+    });
+  }
+  
+  // Function to compare multiple cities
+  function compareMultipleCities(cities, year, month) {
+    // Show loading indicator
+    loader.style.display = 'flex';
+    document.getElementById('comparisonResults').style.display = 'none';
+    
+    // Create array of promises to fetch data for each city
+    const fetchPromises = cities.map(city => {
+      let url = `/api/temperature?state=${encodeURIComponent(city.state)}&city=${encodeURIComponent(city.city)}`;
+      if (year) url += `&year=${year}`;
+      
+      return fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          // Parse data
+          const parsedData = data.map(d => ({
+            city: city.city,
+            state: city.state,
+            index: city.index,
+            year: +d.Year,
+            month: +d.Month,
+            temperature: +d["Temperature (°C)"],
+            minTemp: +d.Min_Temp_C,
+            maxTemp: +d.Max_Temp_C
+          }));
           
-          if (selectedState) {
-            citySelect.disabled = false;
-            const cities = data[selectedState] || [];
-            cities.sort().forEach(city => {
-              const option = document.createElement('option');
-              option.value = city;
-              option.textContent = city;
-              citySelect.appendChild(option);
-            });
-          } else {
-            citySelect.disabled = true;
+          // Filter by month if specified
+          if (month) {
+            return parsedData.filter(d => d.month === parseInt(month));
           }
+          
+          return parsedData;
         });
-      });
-      
-      // Load years for the comparison
-      fetch('/api/years')
-        .then(response => response.json())
-        .then(years => {
-          const yearSelect = document.getElementById('comparisonYear');
-          yearSelect.innerHTML = '<option value="">All Years</option>';
-          years.forEach(year => {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = year;
-            yearSelect.appendChild(option);
-          });
-        })
-        .catch(error => console.error('Error loading years:', error));
-      
-      // Add event listener to compare button
-      document.getElementById('compareBtn').addEventListener('click', function() {
-        const firstState = document.getElementById('firstCityState').value;
-        const firstCity = document.getElementById('firstCity').value;
-        const secondState = document.getElementById('secondCityState').value;
-        const secondCity = document.getElementById('secondCity').value;
-        const year = document.getElementById('comparisonYear').value;
+    });
+    
+    // Fetch all data and render comparison charts
+    Promise.all(fetchPromises)
+      .then(results => {
+        // Hide loader
+        loader.style.display = 'none';
         
-        if (!firstState || !firstCity || !secondState || !secondCity) {
-          alert('Please select both cities to compare');
+        // Store city data for future use
+        cityData = {};
+        results.forEach((cityResult, i) => {
+          const cityInfo = cities[i];
+          cityData[`${cityInfo.city}, ${cityInfo.state}`] = cityResult;
+        });
+        
+        // Check if we have data
+        const hasData = results.every(cityResult => cityResult.length > 0);
+        
+        if (!hasData) {
+          alert('No data available for the selected cities/time period');
           return;
         }
         
-        compareCities(firstState, firstCity, secondState, secondCity, year);
+        // Render comparison charts
+        renderMultiCityComparisonChart(results, year, month);
+        renderMultiCityTemperatureRangeChart(results, year, month);
+        renderYearlyTrendsChart(results, year);
+        
+        // Show results container
+        document.getElementById('comparisonResults').style.display = 'block';
+      })
+      .catch(error => {
+        console.error('Error comparing cities:', error);
+        loader.style.display = 'none';
+        alert('Error fetching data for city comparison');
       });
-    })
-    .catch(error => console.error('Error loading states:', error));
-}
-
-// Function to compare two cities
-function compareCities(firstState, firstCity, secondState, secondCity, year) {
-  // Show loading indicator
-  const loader = document.getElementById('loader');
-  loader.style.display = 'flex';
+  }
   
-  // Fetch data for both cities
-  Promise.all([
-    fetch(`/api/temperature?state=${encodeURIComponent(firstState)}&city=${encodeURIComponent(firstCity)}${year ? `&year=${year}` : ''}`).then(res => res.json()),
-    fetch(`/api/temperature?state=${encodeURIComponent(secondState)}&city=${encodeURIComponent(secondCity)}${year ? `&year=${year}` : ''}`).then(res => res.json())
-  ])
-  .then(([firstCityData, secondCityData]) => {
-    // Hide loader
-    loader.style.display = 'none';
+  // Render multi-city comparison chart
+  function renderMultiCityComparisonChart(cityDataArray, year, month) {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // Parse data
-    const parsedFirstCity = firstCityData.map(d => ({
-      year: +d.Year,
-      month: +d.Month,
-      temperature: +d["Temperature (°C)"],
-      minTemp: +d.Min_Temp_C,
-      maxTemp: +d.Max_Temp_C
-    }));
+    // Get context and destroy existing chart if it exists
+    const ctx = document.getElementById('cityComparisonChart').getContext('2d');
+    if (window.cityCompChart) window.cityCompChart.destroy();
     
-    const parsedSecondCity = secondCityData.map(d => ({
-      year: +d.Year,
-      month: +d.Month,
-      temperature: +d["Temperature (°C)"],
-      minTemp: +d.Min_Temp_C,
-      maxTemp: +d.Max_Temp_C
-    }));
-    
-    // Render comparison charts
-    renderCityComparisonChart(parsedFirstCity, parsedSecondCity, firstCity, secondCity, year);
-    renderTemperatureRangeChart(parsedFirstCity, parsedSecondCity, firstCity, secondCity, year);
-  })
-  .catch(error => {
-    console.error('Error comparing cities:', error);
-    loader.style.display = 'none';
-    alert('Error fetching data for city comparison');
-  });
-}
-
-// Render city comparison chart
-function renderCityComparisonChart(firstCityData, secondCityData, firstCity, secondCity, year) {
-  // Calculate monthly averages for both cities
-  const monthlyAvgFirst = calculateMonthlyAverages(firstCityData);
-  const monthlyAvgSecond = calculateMonthlyAverages(secondCityData);
-  
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  // Get context and destroy existing chart if it exists
-  const ctx = document.getElementById('cityComparisonChart').getContext('2d');
-  if (window.cityCompChart) window.cityCompChart.destroy();
-  
-  // Create new chart
-  window.cityCompChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: monthNames,
-      datasets: [
-        {
-          label: firstCity,
-          data: monthlyAvgFirst,
-          borderColor: '#3498db',
-          backgroundColor: 'rgba(52, 152, 219, 0.1)',
-          tension: 0.3,
-          fill: true
+    // If month is selected, create a different chart type
+    if (month) {
+      // For single month, create a bar chart comparing average temps
+      const cityLabels = [];
+      const avgTemps = [];
+      const bgColors = [];
+      
+      // Generate colors for each city
+      const colorPalette = [
+        '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'
+      ];
+      
+      cityDataArray.forEach((cityData, index) => {
+        if (cityData.length === 0) return;
+        
+        const cityName = `${cityData[0].city}, ${cityData[0].state}`;
+        cityLabels.push(cityName);
+        
+        // Calculate average temperature for the month
+        const avgTemp = cityData.reduce((sum, d) => sum + d.temperature, 0) / cityData.length;
+        avgTemps.push(avgTemp);
+        
+        // Assign color
+        bgColors.push(colorPalette[index % colorPalette.length]);
+      });
+      
+      // Create bar chart
+      window.cityCompChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: cityLabels,
+          datasets: [{
+            label: `Average Temperature for ${monthNames[parseInt(month) - 1]}`,
+            data: avgTemps,
+            backgroundColor: bgColors,
+            borderColor: bgColors.map(c => c.replace('1)', '0.8)')),
+            borderWidth: 1
+          }]
         },
-        {
-          label: secondCity,
-          data: monthlyAvgSecond,
-          borderColor: '#e74c3c',
-          backgroundColor: 'rgba(231, 76, 60, 0.1)',
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: year ? `Temperature Comparison for ${monthNames[parseInt(month) - 1]} ${year}` : `Temperature Comparison for ${monthNames[parseInt(month) - 1]} (All Years)`
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              title: {
+                display: true,
+                text: 'Average Temperature (°C)'
+              }
+            }
+          }
+        }
+      });
+    } else {
+      // For all months, create a line chart showing monthly averages
+      const datasets = [];
+      
+      // Generate colors for each city
+      const colorPalette = [
+        { border: '#3498db', bg: 'rgba(52, 152, 219, 0.1)' },
+        { border: '#e74c3c', bg: 'rgba(231, 76, 60, 0.1)' },
+        { border: '#2ecc71', bg: 'rgba(46, 204, 113, 0.1)' },
+        { border: '#f39c12', bg: 'rgba(243, 156, 18, 0.1)' },
+        { border: '#9b59b6', bg: 'rgba(155, 89, 182, 0.1)' },
+        { border: '#1abc9c', bg: 'rgba(26, 188, 156, 0.1)' }
+      ];
+      
+      cityDataArray.forEach((cityData, index) => {
+        if (cityData.length === 0) return;
+        
+        const cityName = `${cityData[0].city}, ${cityData[0].state}`;
+        const monthlyAvg = calculateMonthlyAverages(cityData);
+        
+        datasets.push({
+          label: cityName,
+          data: monthlyAvg,
+          borderColor: colorPalette[index % colorPalette.length].border,
+          backgroundColor: colorPalette[index % colorPalette.length].bg,
           tension: 0.3,
           fill: true
+        });
+      });
+      
+      // Create line chart
+      window.cityCompChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: monthNames,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: year ? `Monthly Temperature Comparison (${year})` : 'Monthly Temperature Comparison (All Years)'
+            }
+          },
+          scales: {
+            y: {
+              title: {
+                display: true,
+                text: 'Average Temperature (°C)'
+              }
+            }
+          }
         }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: year ? `Monthly Temperature Comparison (${year})` : 'Monthly Temperature Comparison (All Years)'
-        }
+      });
+    }
+  }
+  
+  // Render temperature range chart for multiple cities
+  function renderMultiCityTemperatureRangeChart(cityDataArray, year, month) {
+    // Get context and destroy existing chart if it exists
+    const ctx = document.getElementById('temperatureRangeChart').getContext('2d');
+    if (window.tempRangeChart) window.tempRangeChart.destroy();
+    
+    // Calculate range data for each city
+    const labels = [];
+    const minTemps = [];
+    const avgTemps = [];
+    const maxTemps = [];
+    
+    cityDataArray.forEach(cityData => {
+      if (cityData.length === 0) return;
+      
+      const cityName = `${cityData[0].city}, ${cityData[0].state}`;
+      labels.push(cityName);
+      
+      // Calculate temperature ranges
+      const ranges = calculateTempRanges(cityData);
+      minTemps.push(ranges.minTemp);
+      avgTemps.push(ranges.avgTemp);
+      maxTemps.push(ranges.maxTemp);
+    });
+    
+    // Create stacked bar chart
+    window.tempRangeChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Minimum Temperature (°C)',
+            data: minTemps,
+            backgroundColor: '#3498db'
+          },
+          {
+            label: 'Average Temperature (°C)',
+            data: avgTemps,
+            backgroundColor: '#2ecc71'
+          },
+          {
+            label: 'Maximum Temperature (°C)',
+            data: maxTemps,
+            backgroundColor: '#e74c3c'
+          }
+        ]
       },
-      scales: {
-        y: {
+      options: {
+        responsive: true,
+        plugins: {
           title: {
             display: true,
-            text: 'Average Temperature (°C)'
+            text: year 
+              ? (month 
+                ? `Temperature Range (${year}, ${getMonthName(month)})` 
+                : `Temperature Range (${year})`)
+              : (month 
+                ? `Temperature Range (All Years, ${getMonthName(month)})` 
+                : 'Temperature Range (All Years)')
+          }
+        },
+        scales: {
+          y: {
+            title: {
+              display: true,
+              text: 'Temperature (°C)'
+            }
           }
         }
       }
+    });
+  }
+  
+  // Render yearly trends chart
+  function renderYearlyTrendsChart(cityDataArray, selectedYear) {
+    // Get context and destroy existing chart if it exists
+    const ctx = document.getElementById('yearlyTrendsChart').getContext('2d');
+    if (window.yearlyTrendsChart) window.yearlyTrendsChart.destroy();
+    
+    // If a specific year is selected, don't render this chart
+    if (selectedYear) {
+      document.querySelector('.additional-charts').style.display = 'none';
+      return;
+    } else {
+      document.querySelector('.additional-charts').style.display = 'block';
     }
-  });
-}
-
-// Render temperature range chart
-function renderTemperatureRangeChart(firstCityData, secondCityData, firstCity, secondCity, year) {
-  // Calculate temperature range data
-  const firstCityRanges = calculateTempRanges(firstCityData);
-  const secondCityRanges = calculateTempRanges(secondCityData);
-  
-  // Get context and destroy existing chart if it exists
-  const ctx = document.getElementById('temperatureRangeChart').getContext('2d');
-  if (window.tempRangeChart) window.tempRangeChart.destroy();
-  
-  // Create new chart - stacked bar chart
-  window.tempRangeChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: [firstCity, secondCity],
-      datasets: [
-        {
-          label: 'Minimum Temperature (°C)',
-          data: [firstCityRanges.minTemp, secondCityRanges.minTemp],
-          backgroundColor: '#3498db'
-        },
-        {
-          label: 'Average Temperature (°C)',
-          data: [firstCityRanges.avgTemp, secondCityRanges.avgTemp],
-          backgroundColor: '#2ecc71'
-        },
-        {
-          label: 'Maximum Temperature (°C)',
-          data: [firstCityRanges.maxTemp, secondCityRanges.maxTemp],
-          backgroundColor: '#e74c3c'
+    
+    // Generate datasets for each city
+    const datasets = [];
+    const colorPalette = [
+      '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'
+    ];
+    
+    cityDataArray.forEach((cityData, index) => {
+      if (cityData.length === 0) return;
+      
+      // Calculate yearly averages
+      const yearlyData = {};
+      cityData.forEach(d => {
+        if (!yearlyData[d.year]) {
+          yearlyData[d.year] = { sum: 0, count: 0 };
         }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: year ? `Temperature Range Comparison (${year})` : 'Temperature Range Comparison (All Years)'
-        }
+        yearlyData[d.year].sum += d.temperature;
+        yearlyData[d.year].count++;
+      });
+      
+      // Convert to array of points for chart
+      const years = Object.keys(yearlyData).sort();
+      const avgTemps = years.map(year => ({
+        x: parseInt(year),
+        y: yearlyData[year].sum / yearlyData[year].count
+      }));
+      
+      const cityName = `${cityData[0].city}, ${cityData[0].state}`;
+      
+      datasets.push({
+        label: cityName,
+        data: avgTemps,
+        backgroundColor: colorPalette[index % colorPalette.length],
+        borderColor: colorPalette[index % colorPalette.length],
+        tension: 0.3,
+        pointRadius: 3
+      });
+    });
+    
+    // Create scatter chart with lines for yearly trends
+    window.yearlyTrendsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: datasets
       },
-      scales: {
-        y: {
+      options: {
+        responsive: true,
+        plugins: {
           title: {
             display: true,
-            text: 'Temperature (°C)'
+            text: 'Year-over-Year Temperature Trends'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const point = context.raw;
+                return `${context.dataset.label}: ${point.y.toFixed(1)}°C (${point.x})`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            position: 'bottom',
+            title: {
+              display: true,
+              text: 'Year'
+            },
+            ticks: {
+              stepSize: 5
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Average Temperature (°C)'
+            }
           }
         }
       }
-    }
-  });
+    });
+  }
+  
+  // Helper function to get month name
+  function getMonthName(month) {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                         'July', 'August', 'September', 'October', 'November', 'December'];
+    return monthNames[parseInt(month) - 1];
+  }
 }
 
 // Helper function to calculate monthly averages
