@@ -28,33 +28,86 @@ function initInsightsCharts() {
 
 // Function to initialize visualization charts
 function initVisualizations() {
-  // Fetch temperature data from API
-  fetch('/api/temperature')
+  // Show loading
+  const loader = document.getElementById('loader');
+  loader.style.display = 'flex';
+  
+  // Fetch day-level temperature data for spiral visualization
+  fetch('/api/temperature?day_level=true')
     .then(response => response.json())
-    .then(data => {
-      // Parse the data
-      const tempData = data.map(d => ({
+    .then(dayData => {
+      // Parse the day-level data for spiral
+      const dayTempData = dayData.map(d => ({
+        date: d.DATE,
         year: +d.Year,
-        month: +d.Month,
+        month: +d.Month, 
+        day: +d.Day,
         temperature: +d["Temperature (°C)"],
         minTemp: +d.Min_Temp_C,
         maxTemp: +d.Max_Temp_C
       }));
       
-      // Initialize the spiral chart
-      renderInsightSpiral(tempData);
+      // Render enhanced spiral with day-level data
+      renderInsightSpiral(dayTempData, true);
       
-      // Initialize the heatmap
-      renderVizHeatmap(tempData);
-      
-      // Initialize the bar chart race
-      renderVizBarChartRace(tempData);
-      
-      // Initialize city comparison form
-      initCityComparisonForm();
+      // Fetch monthly data for other visualizations
+      fetch('/api/temperature')
+        .then(response => response.json())
+        .then(monthData => {
+          // Parse the monthly data
+          const monthTempData = monthData.map(d => ({
+            year: +d.Year,
+            month: +d.Month,
+            temperature: +d["Temperature (°C)"],
+            minTemp: +d.Min_Temp_C,
+            maxTemp: +d.Max_Temp_C
+          }));
+          
+          // Initialize the heatmap
+          renderVizHeatmap(monthTempData);
+          
+          // Initialize the bar chart race
+          renderVizBarChartRace(monthTempData);
+          
+          // Initialize city comparison form
+          initCityComparisonForm();
+          
+          // Hide loading
+          loader.style.display = 'none';
+        })
+        .catch(error => {
+          console.error('Error fetching monthly visualization data:', error);
+          loader.style.display = 'none';
+          alert('Error loading monthly data. Please try again later.');
+        });
     })
     .catch(error => {
-      console.error('Error fetching visualization data:', error);
+      console.error('Error fetching day-level visualization data:', error);
+      
+      // Fallback to monthly data if day-level fails
+      fetch('/api/temperature')
+        .then(response => response.json())
+        .then(data => {
+          const tempData = data.map(d => ({
+            year: +d.Year,
+            month: +d.Month,
+            temperature: +d["Temperature (°C)"],
+            minTemp: +d.Min_Temp_C,
+            maxTemp: +d.Max_Temp_C
+          }));
+          
+          renderInsightSpiral(tempData, false);
+          renderVizHeatmap(tempData);
+          renderVizBarChartRace(tempData);
+          initCityComparisonForm();
+          
+          loader.style.display = 'none';
+        })
+        .catch(error => {
+          console.error('Error fetching fallback data:', error);
+          loader.style.display = 'none';
+          alert('Failed to load visualization data. Please try again later.');
+        });
     });
 }
 
@@ -298,9 +351,20 @@ function initCityComparisonForm() {
             maxTemp: +d.Max_Temp_C
           }));
           
-          // Filter by month if specified
+          // If month is specified, filter by that month
           if (month) {
             return parsedData.filter(d => d.month === parseInt(month));
+          }
+          
+          // If no month specified but year is, we keep all months for that year
+          if (year && !month) {
+            // Make sure data is sorted by month for cleaner visualization
+            return parsedData.sort((a, b) => a.month - b.month);
+          }
+          
+          // If neither year nor month is specified, calculate monthly averages across all years
+          if (!year && !month) {
+            return calculateMonthlyAverages(parsedData, city);
           }
           
           return parsedData;
@@ -321,7 +385,7 @@ function initCityComparisonForm() {
         });
         
         // Check if we have data
-        const hasData = results.every(cityResult => cityResult.length > 0);
+        const hasData = results.some(cityResult => cityResult.length > 0);
         
         if (!hasData) {
           alert('No data available for the selected cities/time period');
@@ -331,7 +395,11 @@ function initCityComparisonForm() {
         // Render comparison charts
         renderMultiCityComparisonChart(results, year, month);
         renderMultiCityTemperatureRangeChart(results, year, month);
-        renderYearlyTrendsChart(results, year);
+        
+        // Only show yearly trends chart if a specific year is selected
+        if (year) {
+          renderYearlyTrendsChart(results, year);
+        }
         
         // Show results container
         document.getElementById('comparisonResults').style.display = 'block';
@@ -341,6 +409,45 @@ function initCityComparisonForm() {
         loader.style.display = 'none';
         alert('Error fetching data for city comparison');
       });
+  }
+  
+  // Helper function to calculate monthly averages for a city
+  function calculateMonthlyAverages(data, city) {
+    // Group data by month
+    const monthlyGroups = {};
+    for (let month = 1; month <= 12; month++) {
+      monthlyGroups[month] = data.filter(d => d.month === month);
+    }
+    
+    // Calculate average for each month
+    const monthlyAverages = [];
+    for (let month = 1; month <= 12; month++) {
+      const monthData = monthlyGroups[month];
+      
+      if (monthData && monthData.length > 0) {
+        // Calculate average temperature for this month across all years
+        const avgTemp = monthData.reduce((sum, d) => sum + d.temperature, 0) / monthData.length;
+        
+        // Find min/max temps for this month across all years
+        const minTemp = Math.min(...monthData.map(d => d.minTemp));
+        const maxTemp = Math.max(...monthData.map(d => d.maxTemp));
+        
+        // Add to monthly averages array
+        monthlyAverages.push({
+          city: city.city,
+          state: city.state,
+          index: city.index,
+          year: 0, // 0 indicates this is an average across years
+          month: month,
+          temperature: avgTemp,
+          minTemp: minTemp,
+          maxTemp: maxTemp
+        });
+      }
+    }
+    
+    // Sort by month for visualization
+    return monthlyAverages.sort((a, b) => a.month - b.month);
   }
   
   // Render multi-city comparison chart
@@ -427,11 +534,20 @@ function initCityComparisonForm() {
         if (cityData.length === 0) return;
         
         const cityName = `${cityData[0].city}, ${cityData[0].state}`;
-        const monthlyAvg = calculateMonthlyAverages(cityData);
+        
+        // We need to prepare data for the chart - need an array of 12 temperature values
+        const monthlyAvgData = Array(12).fill(null);
+        
+        // Fill in the data we have
+        cityData.forEach(d => {
+          if (d.month >= 1 && d.month <= 12) {
+            monthlyAvgData[d.month - 1] = d.temperature;
+          }
+        });
         
         datasets.push({
           label: cityName,
-          data: monthlyAvg,
+          data: monthlyAvgData,
           borderColor: colorPalette[index % colorPalette.length].border,
           backgroundColor: colorPalette[index % colorPalette.length].bg,
           tension: 0.3,
@@ -1029,25 +1145,51 @@ function renderRegionalVariationChart(data) {
   });
 }
 
-// Enhanced Spiral Chart - based on Ed Hawkins' climate spiral visualization
-function renderInsightSpiral(data) {
+// Enhanced Daywise Spiral Chart - based on Ed Hawkins' climate spiral visualization
+function renderInsightSpiral(data, isDayLevel = false) {
   // Clear any existing content
   d3.select("#insightSpiralChart").selectAll("*").remove();
   document.getElementById("spiralYearLabel").textContent = "";
   
-  // Sort data by time
-  data.sort((a, b) => (a.year * 12 + a.month) - (b.year * 12 + b.month));
-  
-  // Group the data by year for the spiral visualization
-  const yearlyData = {};
-  data.forEach(d => {
-    if (!yearlyData[d.year]) {
-      yearlyData[d.year] = [];
+  // Function to group data by time period
+  function groupData() {
+    const grouped = {};
+    
+    if (isDayLevel) {
+      // If using day-level data, sort by date
+      data.sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        if (a.month !== b.month) return a.month - b.month;
+        return a.day - b.day;
+      });
+      
+      // Group by year and month for day-level data
+      data.forEach(d => {
+        const yearMonth = `${d.year}-${d.month.toString().padStart(2, '0')}`;
+        if (!grouped[yearMonth]) {
+          grouped[yearMonth] = [];
+        }
+        grouped[yearMonth].push(d);
+      });
+    } else {
+      // For monthly data, sort by year and month
+      data.sort((a, b) => (a.year * 12 + a.month) - (b.year * 12 + b.month));
+      
+      // Group by year
+      data.forEach(d => {
+        if (!grouped[d.year]) {
+          grouped[d.year] = [];
+        }
+        grouped[d.year].push(d);
+      });
     }
-    yearlyData[d.year].push(d);
-  });
+    
+    return grouped;
+  }
   
-  const years = Object.keys(yearlyData).sort();
+  // Group data based on whether it's day-level or monthly
+  const groupedData = groupData();
+  const timePeriods = Object.keys(groupedData).sort();
   
   // Set up SVG and dimensions
   const svg = d3.select("#insightSpiralChart");
@@ -1061,31 +1203,46 @@ function renderInsightSpiral(data) {
   const g = svg.append("g")
     .attr("transform", `translate(${width/2}, ${height/2})`);
   
-  // Set up scales
-  const angleScale = d3.scaleLinear()
-    .domain([1, 13])  // months 1-12 with a bit extra to make December complete
-    .range([0, 2 * Math.PI]);
+  // Set up scales - different for day vs month data
+  let angleScale;
+  if (isDayLevel) {
+    // For day-level data, use day of month (1-31)
+    angleScale = d3.scaleLinear()
+      .domain([1, 32])  // days 1-31 with a bit extra to complete the circle
+      .range([0, 2 * Math.PI]);
+  } else {
+    // For monthly data, use months (1-12)
+    angleScale = d3.scaleLinear()
+      .domain([1, 13])  // months 1-12 with a bit extra to make December complete
+      .range([0, 2 * Math.PI]);
+  }
   
   // Find temperature range from data
   let minTemp = d3.min(data, d => d.temperature) || 15;
   let maxTemp = d3.max(data, d => d.temperature) || 35;
   
   // Pad the range for better visualization
-  minTemp = Math.max(0, Math.floor(minTemp) - 5);
-  maxTemp = Math.ceil(maxTemp) + 5;
+  minTemp = Math.max(0, Math.floor(minTemp) - 2);
+  maxTemp = Math.ceil(maxTemp) + 2;
   
   const radiusScale = d3.scaleLinear()
     .domain([minTemp, maxTemp])  // dynamic temperature range
     .range([innerRadius, outerRadius]);
   
-  // Color scale - more vibrant rainbow temperature scale (blue=cold, red=hot)
+  // Temperature color scale - blue to red for cold to hot
   const tempColorScale = d3.scaleSequential()
     .domain([minTemp, maxTemp])
-    .interpolator(d3.interpolateRdYlBu);
+    .interpolator(d3.interpolateRgbBasis([
+      "#0a4fa0", // Deep blue (coldest)
+      "#39c0e6", // Light blue
+      "#eeeeee", // White (neutral)
+      "#f5a300", // Orange
+      "#d60404"  // Deep red (hottest)
+    ]));
   
-  // Month color scale for visual distinction
-  const monthColorScale = d3.scaleSequential()
-    .domain([1, 12])
+  // Month/Day color scale for visual distinction
+  const timeColorScale = d3.scaleSequential()
+    .domain([1, isDayLevel ? 31 : 12])
     .interpolator(d3.interpolateRainbow);
   
   // Draw temperature reference circles
@@ -1114,128 +1271,209 @@ function renderInsightSpiral(data) {
       .text(`${temp}°C`);
   });
   
-  // Month labels around the circle
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthAngles = [];
+  // Add reference labels around the circle
+  if (isDayLevel) {
+    // For day-level, add day markers every 5 days
+    const dayLabels = [1, 5, 10, 15, 20, 25, 30];
+    
+    dayLabels.forEach(day => {
+      const angle = angleScale(day) - Math.PI / 2;
+      const radius = outerRadius + 15;
+      
+      // Day labels
+      g.append("text")
+        .attr("x", radius * Math.cos(angle))
+        .attr("y", radius * Math.sin(angle))
+        .attr("text-anchor", "middle")
+        .attr("font-size", "11px")
+        .attr("fill", timeColorScale(day))
+        .text(`Day ${day}`);
+      
+      // Draw reference lines
+      g.append("line")
+        .attr("x1", 0)
+        .attr("y1", 0)
+        .attr("x2", (outerRadius + 5) * Math.cos(angle))
+        .attr("y2", (outerRadius + 5) * Math.sin(angle))
+        .attr("stroke", timeColorScale(day))
+        .attr("stroke-width", 0.5)
+        .attr("opacity", 0.3);
+    });
+  } else {
+    // For monthly data, add month labels
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    monthNames.forEach((name, i) => {
+      const monthIndex = i + 1;
+      const angle = angleScale(monthIndex) - Math.PI / 2;
+      
+      const radius = outerRadius + 15;
+      
+      // Month names
+      g.append("text")
+        .attr("x", radius * Math.cos(angle))
+        .attr("y", radius * Math.sin(angle))
+        .attr("text-anchor", "middle")
+        .attr("font-size", "11px")
+        .attr("fill", timeColorScale(monthIndex))
+        .text(name);
+      
+      // Draw lines from center to month positions
+      g.append("line")
+        .attr("x1", 0)
+        .attr("y1", 0)
+        .attr("x2", (outerRadius + 5) * Math.cos(angle))
+        .attr("y2", (outerRadius + 5) * Math.sin(angle))
+        .attr("stroke", timeColorScale(monthIndex))
+        .attr("stroke-width", 0.5)
+        .attr("opacity", 0.3);
+    });
+  }
   
-  monthNames.forEach((name, i) => {
-    const monthIndex = i + 1;
-    const angle = angleScale(monthIndex) - Math.PI / 2;
-    monthAngles.push(angle);
-    
-    const radius = outerRadius + 15;
-    
-    // Month names
-    g.append("text")
-      .attr("x", radius * Math.cos(angle))
-      .attr("y", radius * Math.sin(angle))
-      .attr("text-anchor", "middle")
-      .attr("font-size", "11px")
-      .attr("fill", monthColorScale(monthIndex))
-      .text(name);
-    
-    // Draw lines from center to month positions
-    g.append("line")
-      .attr("x1", 0)
-      .attr("y1", 0)
-      .attr("x2", (outerRadius + 5) * Math.cos(angle))
-      .attr("y2", (outerRadius + 5) * Math.sin(angle))
-      .attr("stroke", monthColorScale(monthIndex))
-      .attr("stroke-width", 0.5)
-      .attr("opacity", 0.3);
-  });
-  
-  // Create a group for all year paths
+  // Create a group for all time period paths
   const spiralGroup = g.append("g").attr("class", "spiral-group");
   
-  // Create continuous line generator for the spiral
-  const lineGenerator = d3.lineRadial()
-    .angle(d => angleScale(d.month) - Math.PI / 2)
-    .radius(d => radiusScale(d.temperature))
-    .curve(d3.curveCardinalClosed);
+  // Create line generator - different for day vs month
+  const lineGenerator = isDayLevel
+    ? d3.lineRadial()
+        .angle(d => angleScale(d.day) - Math.PI / 2)
+        .radius(d => radiusScale(d.temperature))
+        .curve(d3.curveCardinalClosed)
+    : d3.lineRadial()
+        .angle(d => angleScale(d.month) - Math.PI / 2)
+        .radius(d => radiusScale(d.temperature))
+        .curve(d3.curveCardinalClosed);
   
-  // Create array to hold all year paths
-  const yearPaths = [];
+  // Create array to hold all path data
+  const periodPaths = [];
   
-  // Draw each year's path
-  years.forEach(year => {
-    // Get complete monthly data for this year
-    const yearData = yearlyData[year];
+  // Draw each time period's path
+  timePeriods.forEach(period => {
+    // Get data for this time period
+    const periodData = groupedData[period];
     
     // Make sure we have enough data points
-    if (yearData.length < 3) return;
+    if (periodData.length < 3) return;
     
-    // Sort by month
-    yearData.sort((a, b) => a.month - b.month);
+    // Sort by day or month
+    if (isDayLevel) {
+      periodData.sort((a, b) => a.day - b.day);
+    } else {
+      periodData.sort((a, b) => a.month - b.month);
+    }
     
-    // Create a path for this year
-    const yearPath = spiralGroup.append("path")
-      .datum(yearData)
+    // Get display name for the time period
+    const displayName = isDayLevel 
+      ? `${periodData[0].year}-${periodData[0].month}` 
+      : periodData[0].year;
+    
+    // Create a path for this time period
+    const periodPath = spiralGroup.append("path")
+      .datum(periodData)
       .attr("d", lineGenerator)
       .attr("fill", "none")
-      .attr("stroke-width", 2.5)
+      .attr("stroke-width", 3)
       .attr("stroke", "#fff") // Initial color will be overridden
       .attr("opacity", 0)  // Start hidden
-      .attr("class", `year-${year}`);
+      .attr("class", `period-${period}`);
+    
+    // If it's day level data, also add points for each day
+    if (isDayLevel) {
+      const dayPoints = spiralGroup.append("g")
+        .attr("class", `points-${period}`)
+        .style("opacity", 0);
       
-    yearPaths.push({ year, path: yearPath, data: yearData });
+      // Add dots for each day with temperature-based coloring
+      dayPoints.selectAll("circle")
+        .data(periodData)
+        .enter()
+        .append("circle")
+        .attr("cx", d => radiusScale(d.temperature) * Math.cos(angleScale(d.day) - Math.PI / 2))
+        .attr("cy", d => radiusScale(d.temperature) * Math.sin(angleScale(d.day) - Math.PI / 2))
+        .attr("r", 2)
+        .attr("fill", d => tempColorScale(d.temperature));
+      
+      periodPaths.push({ period, path: periodPath, points: dayPoints, data: periodData, displayName });
+    } else {
+      periodPaths.push({ period, path: periodPath, data: periodData, displayName });
+    }
   });
   
-  // Function to highlight specific years with vivid colors
-  function updateSpiralYear(yearIndex) {
-    // Get the selected year
-    const selectedYear = years[yearIndex];
+  // Function to highlight specific time periods with vivid colors
+  function updateSpiralPeriod(periodIndex) {
+    // Get the selected period
+    const selectedPeriod = timePeriods[periodIndex];
+    const selectedPathData = periodPaths.find(p => p.period === selectedPeriod);
     
-    // Update the year label
-    document.getElementById("spiralYearLabel").textContent = selectedYear;
+    if (!selectedPathData) return;
     
-    // Update each year path
-    yearPaths.forEach(({ year, path, data }) => {
-      const yearNum = parseInt(year);
-      const selectedYearNum = parseInt(selectedYear);
-      
-      // Calculate opacity and width based on how close this year is to the selected year
+    // Update the period label
+    document.getElementById("spiralYearLabel").textContent = selectedPathData.displayName;
+    
+    // Remove any existing gradients to avoid memory leaks
+    svg.selectAll("linearGradient").remove();
+    
+    // Update each period's path
+    periodPaths.forEach(({ period, path, points, data }) => {
+      // Calculate opacity based on how close this period is to the selected one
       let opacity = 0;
       let strokeWidth = 2.5;
       
-      if (yearNum <= selectedYearNum) {
-        // Years before or equal to selected year are visible
-        if (yearNum === selectedYearNum) {
-          // Current year is fully opaque and thicker
+      const periodIndex = timePeriods.indexOf(period);
+      const selectedIndex = timePeriods.indexOf(selectedPeriod);
+      
+      if (periodIndex <= selectedIndex) {
+        // Periods before or equal to selected are visible
+        if (period === selectedPeriod) {
+          // Current period is fully opaque and thicker
           opacity = 1;
           strokeWidth = 4;
           
-          // Apply a gradient color pattern along the path
-          const gradientId = `temp-gradient-${year}`;
+          // Apply gradient pattern based on temperature
+          const gradientId = `temp-gradient-${period.replace(/[^a-zA-Z0-9]/g, '_')}`;
           
-          // Create gradient for current year (temperature-based)
+          // Create gradient for current period
           const gradient = svg.append("linearGradient")
             .attr("id", gradientId)
             .attr("gradientUnits", "userSpaceOnUse");
-            
-          // Add color stops based on monthly temperatures
-          const sortedData = [...data].sort((a, b) => a.temperature - b.temperature);
-          sortedData.forEach((d, i) => {
+          
+          // Add color stops
+          data.forEach((d, i) => {
             gradient.append("stop")
-              .attr("offset", `${(i / (sortedData.length - 1)) * 100}%`)
+              .attr("offset", `${(i / (data.length - 1)) * 100}%`)
               .attr("stop-color", tempColorScale(d.temperature));
           });
           
-          // Apply gradient to path
+          // Apply gradient
           path.attr("stroke", `url(#${gradientId})`);
+          
+          // If day-level, show the day points too
+          if (points) {
+            points.transition().duration(200).style("opacity", 1);
+          }
         } else {
-          // Past years get faded effect based on how far back they are
-          const yearDiff = selectedYearNum - yearNum;
-          opacity = Math.max(0.05, 1 - (yearDiff / 10));
+          // Past periods get faded effect
+          const periodDiff = selectedIndex - periodIndex;
+          const fadeFactor = isDayLevel ? 20 : 10; // Fade more quickly for day-level data
+          opacity = Math.max(0.05, 1 - (periodDiff / fadeFactor));
           strokeWidth = 2;
           
-          // Apply a static color based on average temperature
+          // Use average temperature for color
           const avgTemp = data.reduce((sum, d) => sum + d.temperature, 0) / data.length;
           path.attr("stroke", tempColorScale(avgTemp));
+          
+          // Hide day points for past periods
+          if (points) {
+            points.transition().duration(200).style("opacity", 0);
+          }
         }
+      } else {
+        // Future periods are hidden
+        opacity = 0;
+        if (points) points.style("opacity", 0);
       }
       
-      // Apply updated styles
+      // Apply styles
       path.transition()
         .duration(200)
         .attr("opacity", opacity)
@@ -1245,11 +1483,11 @@ function renderInsightSpiral(data) {
   
   // Set up slider interaction
   const slider = document.getElementById("spiralYearSlider");
-  slider.max = years.length - 1;
+  slider.max = timePeriods.length - 1;
   slider.value = 0;
   
   slider.addEventListener("input", function() {
-    updateSpiralYear(+this.value);
+    updateSpiralPeriod(+this.value);
   });
   
   // Auto-play functionality
@@ -1264,28 +1502,38 @@ function renderInsightSpiral(data) {
       this.textContent = "Play Animation";
     } else {
       // Start playback from current position
-      let yearIndex = +slider.value;
+      let periodIndex = +slider.value;
       this.textContent = "Pause Animation";
       
+      // Speed up for day-level data since there are more periods
+      const intervalSpeed = isDayLevel ? 150 : 300;
+      
       playInterval = setInterval(() => {
-        yearIndex = (yearIndex + 1) % years.length;
-        slider.value = yearIndex;
-        updateSpiralYear(yearIndex);
+        periodIndex = (periodIndex + 1) % timePeriods.length;
+        slider.value = periodIndex;
+        updateSpiralPeriod(periodIndex);
         
-        if (yearIndex === years.length - 1) {
+        if (periodIndex === timePeriods.length - 1) {
           // Loop back to beginning after a slight pause
           setTimeout(() => {
             if (playInterval) {
-              yearIndex = 0;
+              periodIndex = 0;
               slider.value = 0;
-              updateSpiralYear(0);
+              updateSpiralPeriod(0);
             }
           }, 1000);
         }
-      }, 300);
+      }, intervalSpeed);
     }
   });
   
-  // Initialize with the first year
-  updateSpiralYear(0);
+  // Initialize with the first period
+  updateSpiralPeriod(0);
+  
+  // Auto-start the animation for better user experience
+  setTimeout(() => {
+    if (playBtn.textContent !== "Pause Animation") {
+      playBtn.click();
+    }
+  }, 1000);
 }
