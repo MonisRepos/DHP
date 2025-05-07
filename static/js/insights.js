@@ -674,8 +674,12 @@ function renderRegionalVariationChart(data) {
   });
 }
 
-// Insight Spiral Chart - based on Ed Hawkins' climate spiral
+// Enhanced Spiral Chart - based on Ed Hawkins' climate spiral visualization
 function renderInsightSpiral(data) {
+  // Clear any existing content
+  d3.select("#insightSpiralChart").selectAll("*").remove();
+  document.getElementById("spiralYearLabel").textContent = "";
+  
   // Sort data by time
   data.sort((a, b) => (a.year * 12 + a.month) - (b.year * 12 + b.month));
   
@@ -689,7 +693,6 @@ function renderInsightSpiral(data) {
   });
   
   const years = Object.keys(yearlyData).sort();
-  const spiralData = years.flatMap(year => yearlyData[year]);
   
   // Set up SVG and dimensions
   const svg = d3.select("#insightSpiralChart");
@@ -705,114 +708,191 @@ function renderInsightSpiral(data) {
   
   // Set up scales
   const angleScale = d3.scaleLinear()
-    .domain([1, 12.1])  // months 1-12 (12.1 to make December visible)
+    .domain([1, 13])  // months 1-12 with a bit extra to make December complete
     .range([0, 2 * Math.PI]);
   
+  // Find temperature range from data
+  let minTemp = d3.min(data, d => d.temperature) || 15;
+  let maxTemp = d3.max(data, d => d.temperature) || 35;
+  
+  // Pad the range for better visualization
+  minTemp = Math.max(0, Math.floor(minTemp) - 5);
+  maxTemp = Math.ceil(maxTemp) + 5;
+  
   const radiusScale = d3.scaleLinear()
-    .domain([0, 40])  // temperature range
+    .domain([minTemp, maxTemp])  // dynamic temperature range
     .range([innerRadius, outerRadius]);
   
-  // Color scale - from cool blues to warm reds
-  const colorScale = d3.scaleSequential()
-    .domain([15, 35])  // temperature range for coloring
+  // Color scale - more vibrant rainbow temperature scale (blue=cold, red=hot)
+  const tempColorScale = d3.scaleSequential()
+    .domain([minTemp, maxTemp])
     .interpolator(d3.interpolateRdYlBu);
-    
+  
+  // Month color scale for visual distinction
+  const monthColorScale = d3.scaleSequential()
+    .domain([1, 12])
+    .interpolator(d3.interpolateRainbow);
+  
   // Draw temperature reference circles
-  const tempRanges = [10, 15, 20, 25, 30, 35];
+  const tempRanges = [];
+  const tempStep = (maxTemp - minTemp) / 5;
+  for (let temp = minTemp; temp <= maxTemp; temp += tempStep) {
+    tempRanges.push(Math.round(temp));
+  }
+  
+  // Add the reference circles
   tempRanges.forEach(temp => {
     g.append("circle")
       .attr("r", radiusScale(temp))
       .attr("fill", "none")
-      .attr("stroke", "#333")
+      .attr("stroke", "#555")
       .attr("stroke-width", 0.5)
       .attr("stroke-dasharray", "2,2")
-      .attr("opacity", 0.5);
+      .attr("opacity", 0.4);
       
     g.append("text")
       .attr("y", -radiusScale(temp))
       .attr("dy", "-0.3em")
       .attr("text-anchor", "middle")
       .attr("font-size", "10px")
-      .attr("fill", "#aaa")
+      .attr("fill", "#bbb")
       .text(`${temp}°C`);
   });
   
   // Month labels around the circle
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthAngles = [];
+  
   monthNames.forEach((name, i) => {
-    const angle = angleScale(i + 1) - Math.PI / 2;
+    const monthIndex = i + 1;
+    const angle = angleScale(monthIndex) - Math.PI / 2;
+    monthAngles.push(angle);
+    
     const radius = outerRadius + 15;
+    
+    // Month names
     g.append("text")
       .attr("x", radius * Math.cos(angle))
       .attr("y", radius * Math.sin(angle))
       .attr("text-anchor", "middle")
-      .attr("font-size", "10px")
+      .attr("font-size", "11px")
+      .attr("fill", monthColorScale(monthIndex))
       .text(name);
+    
+    // Draw lines from center to month positions
+    g.append("line")
+      .attr("x1", 0)
+      .attr("y1", 0)
+      .attr("x2", (outerRadius + 5) * Math.cos(angle))
+      .attr("y2", (outerRadius + 5) * Math.sin(angle))
+      .attr("stroke", monthColorScale(monthIndex))
+      .attr("stroke-width", 0.5)
+      .attr("opacity", 0.3);
   });
   
-  // Create year groups to hold each year's spiral segment
-  const yearGroups = {};
-  years.forEach(year => {
-    yearGroups[year] = g.append("g")
-      .attr("class", `year-${year}`)
-      .style("display", "none");  // Initially hide all
-  });
+  // Create a group for all year paths
+  const spiralGroup = g.append("g").attr("class", "spiral-group");
   
-  // Create the spiral paths for each year
+  // Create continuous line generator for the spiral
+  const lineGenerator = d3.lineRadial()
+    .angle(d => angleScale(d.month) - Math.PI / 2)
+    .radius(d => radiusScale(d.temperature))
+    .curve(d3.curveCardinalClosed);
+  
+  // Create array to hold all year paths
+  const yearPaths = [];
+  
+  // Draw each year's path
   years.forEach(year => {
+    // Get complete monthly data for this year
     const yearData = yearlyData[year];
     
-    // Skip if not enough data points
-    if (yearData.length < 2) return;
+    // Make sure we have enough data points
+    if (yearData.length < 3) return;
     
-    // Create line generator
-    const lineGenerator = d3.lineRadial()
-      .angle(d => angleScale(d.month) - Math.PI / 2)
-      .radius(d => radiusScale(d.temperature))
-      .curve(d3.curveLinear);
+    // Sort by month
+    yearData.sort((a, b) => a.month - b.month);
     
-    // Add the path
-    yearGroups[year].append("path")
+    // Create a path for this year
+    const yearPath = spiralGroup.append("path")
       .datum(yearData)
       .attr("d", lineGenerator)
       .attr("fill", "none")
       .attr("stroke-width", 2.5)
-      .attr("stroke", d => {
-        // Use different colors for different years
-        const avgTemp = d.reduce((sum, item) => sum + item.temperature, 0) / d.length;
-        return d3.interpolateRdYlBu(1 - (avgTemp - 15) / 20);  // Reverse colorScale for RdYlBu
-      });
+      .attr("stroke", "#fff") // Initial color will be overridden
+      .attr("opacity", 0)  // Start hidden
+      .attr("class", `year-${year}`);
       
-    // Add dots for each month
-    yearGroups[year].selectAll(".month-dot")
-      .data(yearData)
-      .enter()
-      .append("circle")
-      .attr("class", "month-dot")
-      .attr("cx", d => radiusScale(d.temperature) * Math.cos(angleScale(d.month) - Math.PI / 2))
-      .attr("cy", d => radiusScale(d.temperature) * Math.sin(angleScale(d.month) - Math.PI / 2))
-      .attr("r", 3)
-      .attr("fill", d => d3.interpolateRdYlBu(1 - (d.temperature - 15) / 20));
+    yearPaths.push({ year, path: yearPath, data: yearData });
   });
   
-  // Function to update the display for a specific year
+  // Function to highlight specific years with vivid colors
   function updateSpiralYear(yearIndex) {
-    // Hide all year groups
-    Object.values(yearGroups).forEach(g => g.style("display", "none"));
+    // Get the selected year
+    const selectedYear = years[yearIndex];
     
-    // Show all years up to the selected year
-    for (let i = 0; i <= yearIndex; i++) {
-      const year = years[i];
-      if (year) yearGroups[year].style("display", "block");
-    }
+    // Update the year label
+    document.getElementById("spiralYearLabel").textContent = selectedYear;
     
-    // Update year label
-    document.getElementById("spiralYearLabel").textContent = years[yearIndex];
+    // Update each year path
+    yearPaths.forEach(({ year, path, data }) => {
+      const yearNum = parseInt(year);
+      const selectedYearNum = parseInt(selectedYear);
+      
+      // Calculate opacity and width based on how close this year is to the selected year
+      let opacity = 0;
+      let strokeWidth = 2.5;
+      
+      if (yearNum <= selectedYearNum) {
+        // Years before or equal to selected year are visible
+        if (yearNum === selectedYearNum) {
+          // Current year is fully opaque and thicker
+          opacity = 1;
+          strokeWidth = 4;
+          
+          // Apply a gradient color pattern along the path
+          const gradientId = `temp-gradient-${year}`;
+          
+          // Create gradient for current year (temperature-based)
+          const gradient = svg.append("linearGradient")
+            .attr("id", gradientId)
+            .attr("gradientUnits", "userSpaceOnUse");
+            
+          // Add color stops based on monthly temperatures
+          const sortedData = [...data].sort((a, b) => a.temperature - b.temperature);
+          sortedData.forEach((d, i) => {
+            gradient.append("stop")
+              .attr("offset", `${(i / (sortedData.length - 1)) * 100}%`)
+              .attr("stop-color", tempColorScale(d.temperature));
+          });
+          
+          // Apply gradient to path
+          path.attr("stroke", `url(#${gradientId})`);
+        } else {
+          // Past years get faded effect based on how far back they are
+          const yearDiff = selectedYearNum - yearNum;
+          opacity = Math.max(0.05, 1 - (yearDiff / 10));
+          strokeWidth = 2;
+          
+          // Apply a static color based on average temperature
+          const avgTemp = data.reduce((sum, d) => sum + d.temperature, 0) / data.length;
+          path.attr("stroke", tempColorScale(avgTemp));
+        }
+      }
+      
+      // Apply updated styles
+      path.transition()
+        .duration(200)
+        .attr("opacity", opacity)
+        .attr("stroke-width", strokeWidth);
+    });
   }
   
   // Set up slider interaction
   const slider = document.getElementById("spiralYearSlider");
   slider.max = years.length - 1;
+  slider.value = 0;
+  
   slider.addEventListener("input", function() {
     updateSpiralYear(+this.value);
   });
@@ -828,7 +908,7 @@ function renderInsightSpiral(data) {
       playInterval = null;
       this.textContent = "Play Animation";
     } else {
-      // Start playback
+      // Start playback from current position
       let yearIndex = +slider.value;
       this.textContent = "Pause Animation";
       
@@ -838,10 +918,14 @@ function renderInsightSpiral(data) {
         updateSpiralYear(yearIndex);
         
         if (yearIndex === years.length - 1) {
-          // Optionally stop at the end
-          // clearInterval(playInterval);
-          // playInterval = null;
-          // playBtn.textContent = "Play Animation";
+          // Loop back to beginning after a slight pause
+          setTimeout(() => {
+            if (playInterval) {
+              yearIndex = 0;
+              slider.value = 0;
+              updateSpiralYear(0);
+            }
+          }, 1000);
         }
       }, 300);
     }
