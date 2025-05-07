@@ -1,146 +1,264 @@
-{% extends 'layout.html' %}
+{% extends "layout.html" %}
 
-{% block title %}Weather Analysis Dashboard - Analysis{% endblock %}
+{% block title %}Weather Data Analysis{% endblock %}
+
+{% block head %}
+<style>
+  .chart-container {
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    background-color: var(--subtle);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+  }
+  
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .chart-tools {
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .spiralControls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .control-label {
+    min-width: 80px;
+  }
+  
+  .yearSelectRow {
+    margin: 1rem 0;
+  }
+  
+  #loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    flex-direction: column;
+    color: white;
+  }
+  
+  .filters {
+    padding: 1rem;
+    background-color: var(--subtle);
+    border-radius: var(--border-radius);
+    margin-bottom: 1.5rem;
+  }
+  
+  .filter-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  
+  .filter-group {
+    flex: 1;
+    min-width: 200px;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <h1 class="mb-4">Weather Data Analysis</h1>
-    
-    <!-- Filters Section -->
-    <div class="filter-section">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label for="stateSelect" class="filter-label">State</label>
-                <select id="stateSelect" class="form-select">
-                    {% for state in states_and_cities.states %}
-                    <option value="{{ state.name }}" {% if state.name == selected_state %}selected{% endif %}>{{ state.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="col-md-3">
-                <label for="citySelect" class="filter-label">City</label>
-                <select id="citySelect" class="form-select">
-                    {% for state in states_and_cities.states %}
-                        {% if state.name == selected_state %}
-                            {% for city in state.cities %}
-                            <option value="{{ city }}" {% if city == selected_city %}selected{% endif %}>{{ city }}</option>
-                            {% endfor %}
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="col-md-2">
-                <label for="yearSelect" class="filter-label">Year</label>
-                <select id="yearSelect" class="form-select">
-                    <option value="">All Years</option>
-                    {% for year in available_years %}
-                    <option value="{{ year }}" {% if year|string == selected_year %}selected{% endif %}>{{ year }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="col-md-2">
-                <label for="monthSelect" class="filter-label">Month</label>
-                <select id="monthSelect" class="form-select">
-                    <option value="">All Months</option>
-                    <option value="1">January</option>
-                    <option value="2">February</option>
-                    <option value="3">March</option>
-                    <option value="4">April</option>
-                    <option value="5">May</option>
-                    <option value="6">June</option>
-                    <option value="7">July</option>
-                    <option value="8">August</option>
-                    <option value="9">September</option>
-                    <option value="10">October</option>
-                    <option value="11">November</option>
-                    <option value="12">December</option>
-                </select>
-            </div>
-            
-            <div class="col-md-2 d-flex align-items-end">
-                <button id="applyFilter" class="btn btn-primary w-100">Apply Filters</button>
-            </div>
+<div class="container" style="padding-top: 2rem; padding-bottom: 2rem;">
+  <h1>Weather Data Analysis</h1>
+  <p class="lead">Explore historical temperature data for {{ selected_city or 'Delhi' }}, {{ selected_state or 'Delhi' }} with interactive charts and visualizations.</p>
+  
+  <!-- Filters Section -->
+  <div class="filters">
+    <h2><i class="fas fa-filter"></i> Data Filters</h2>
+    <form action="{{ url_for('analysis') }}" method="get">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label for="stateFilter">State:</label>
+          <select id="stateFilter" name="state" class="form-control">
+            <option value="">-- Select State --</option>
+            {% for state in states_and_cities %}
+              <option value="{{ state }}" {% if state == selected_state %}selected{% endif %}>{{ state }}</option>
+            {% endfor %}
+          </select>
         </div>
+        
+        <div class="filter-group">
+          <label for="cityFilter">City:</label>
+          <select id="cityFilter" name="city" class="form-control">
+            <option value="">-- Select City --</option>
+            {% if selected_state %}
+              {% for city in states_and_cities[selected_state] %}
+                <option value="{{ city }}" {% if city == selected_city %}selected{% endif %}>{{ city }}</option>
+              {% endfor %}
+            {% endif %}
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label for="yearFilter">Year:</label>
+          <select id="yearFilter" name="year" class="form-control">
+            <option value="">All Years</option>
+            {% for year in available_years %}
+              <option value="{{ year }}" {% if year|string == selected_year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="filter-group" style="display: flex; align-items: flex-end;">
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1.5rem;">Apply Filters</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  
+  <!-- Loading indicator -->
+  <div id="loader">
+    <div class="spinner-border text-light mb-3" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p>Loading temperature data...</p>
+  </div>
+  
+  <!-- Temperature Spiral Visualization -->
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2><i class="fas fa-circle-notch"></i> Temperature Spiral (1975-2022)</h2>
+      <div class="chart-tools">
+        <button class="btn btn-sm btn-outline-secondary" id="downloadSpiralBtn">
+          <i class="fas fa-download"></i>
+        </button>
+      </div>
+    </div>
+    <div style="text-align: center;">
+      <svg id="spiralChart" width="600" height="600"></svg>
+      <div class="spiralControls">
+        <div class="control-row">
+          <button id="playPauseBtn" class="btn btn-primary">Play</button>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Speed:</span>
+          <input type="range" id="speedSlider" min="50" max="1000" value="250" class="form-range">
+        </div>
+        <div class="control-row">
+          <span class="control-label">Timeline:</span>
+          <input type="range" id="timeSlider" min="0" value="0" class="form-range">
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Temperature Heatmap -->
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2><i class="fas fa-th"></i> Temperature Heatmap</h2>
+      <div class="chart-tools">
+        <button class="btn btn-sm btn-outline-secondary" id="downloadHeatmapBtn">
+          <i class="fas fa-download"></i>
+        </button>
+      </div>
+    </div>
+    <div style="text-align: center; overflow-x: auto;">
+      <svg id="heatmapChart" width="800" height="400"></svg>
+    </div>
+  </div>
+  
+  <!-- Two Column Charts Grid -->
+  <div class="charts-grid">
+    <!-- Bar Chart Race -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <h2><i class="fas fa-chart-bar"></i> Temperature Bar Chart Race</h2>
+      </div>
+      <canvas id="barRaceChart" height="300"></canvas>
     </div>
     
-    <!-- Error message -->
-    <div id="chartError" class="alert alert-danger" role="alert"></div>
-    
-    <!-- Charts Layout -->
-    <div class="row g-4">
-        <!-- Temperature Spiral -->
-        <div class="col-lg-6">
-            <div class="chart-container">
-                <h2 class="chart-title">Temperature Spiral</h2>
-                <svg id="spiralChart" width="100%" height="400"></svg>
-                <div class="spiral-controls">
-                    <button id="playPauseBtn" class="btn btn-sm btn-outline-primary">Play</button>
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="speedSlider" class="form-label mb-0">Speed:</label>
-                        <input type="range" class="form-range" id="speedSlider" min="50" max="1000" value="500" style="width: 100px;">
-                    </div>
-                    <div class="flex-grow-1">
-                        <input type="range" class="form-range" id="timeSlider" min="0" max="100" value="0">
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Yearly Heatmap -->
-        <div class="col-lg-6">
-            <div class="chart-container">
-                <h2 class="chart-title">Yearly Temperature Heatmap</h2>
-                <svg id="heatmapChart" width="100%" height="400"></svg>
-            </div>
-        </div>
-        
-        <!-- Bar Chart Race -->
-        <div class="col-lg-6">
-            <div class="chart-container">
-                <h2 class="chart-title">Bar Chart Race</h2>
-                <canvas id="barRaceChart" height="300"></canvas>
-            </div>
-        </div>
-        
-        <!-- Yearly Line Chart -->
-        <div class="col-lg-6">
-            <div class="chart-container">
-                <h2 class="chart-title">Year-by-Year Average Temperature</h2>
-                <canvas id="yearlyLineChart" height="300"></canvas>
-            </div>
-        </div>
-        
-        <!-- Single Year Analysis -->
-        <div class="col-lg-6">
-            <div class="chart-container">
-                <h2 class="chart-title">Single Year Analysis</h2>
-                <div class="mb-3">
-                    <label for="yearSelect" class="form-label">Select Year:</label>
-                    <select id="yearSelect" class="form-select" style="width: auto;"></select>
-                </div>
-                <canvas id="singleYearChart" height="300"></canvas>
-            </div>
-        </div>
-        
-        <!-- Min-Max Temperature -->
-        <div class="col-lg-6">
-            <div class="chart-container">
-                <h2 class="chart-title">Min/Max Temperature Analysis</h2>
-                <div class="mb-3">
-                    <label for="minMaxYearSelect" class="form-label">Select Year:</label>
-                    <select id="minMaxYearSelect" class="form-select" style="width: auto;"></select>
-                </div>
-                <canvas id="minMaxChart" height="300"></canvas>
-            </div>
-        </div>
+    <!-- Yearly Line Chart -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <h2><i class="fas fa-chart-line"></i> Yearly Temperature Trends</h2>
+      </div>
+      <canvas id="yearlyLineChart" height="300"></canvas>
     </div>
+  </div>
+  
+  <!-- Single Year Analysis -->
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2><i class="fas fa-calendar-alt"></i> Single Year Analysis</h2>
+    </div>
+    <div class="yearSelectRow">
+      <label for="yearSelect">Select Year:</label>
+      <select id="yearSelect" class="form-select"></select>
+    </div>
+    <canvas id="singleYearChart" height="300"></canvas>
+  </div>
+  
+  <!-- Min/Max Temperature Chart -->
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2><i class="fas fa-temperature-high"></i> Min/Max Temperature Range</h2>
+    </div>
+    <div class="yearSelectRow">
+      <label for="minMaxYearSelect">Select Year:</label>
+      <select id="minMaxYearSelect" class="form-select"></select>
+    </div>
+    <canvas id="minMaxChart" height="300"></canvas>
+  </div>
 </div>
-
-<!-- Scripts -->
-{% block scripts %}
-<script src="/static/js/charts.js"></script>
 {% endblock %}
+
+{% block scripts %}
+<script>
+  // Handle state change in filter
+  document.getElementById('stateFilter').addEventListener('change', function() {
+    const stateSelect = this;
+    const citySelect = document.getElementById('cityFilter');
+    const selectedState = stateSelect.value;
+    
+    // Clear city options
+    citySelect.innerHTML = '<option value="">-- Select City --</option>';
+    
+    if (selectedState) {
+      // Fetch cities for the selected state
+      fetch(`/api/states`)
+        .then(response => response.json())
+        .then(data => {
+          if (data[selectedState]) {
+            data[selectedState].forEach(city => {
+              const option = document.createElement('option');
+              option.value = city;
+              option.textContent = city;
+              citySelect.appendChild(option);
+            });
+          }
+        })
+        .catch(error => console.error('Error fetching cities:', error));
+    }
+  });
+</script>
 {% endblock %}
