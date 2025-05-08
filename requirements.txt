@@ -67,7 +67,7 @@ jupyter_core==5.7.1
 jusText==3.0.2
 kagglehub==0.3.11
 kiwisolver==1.4.5
-lxml==5.1.0
+lxml==5.4.0
 lxml_html_clean==0.4.2
 MarkupSafe==2.1.5
 matplotlib==3.8.4
