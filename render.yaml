@@ -1,6 +1,7 @@
 services:
   - type: web
-    name: dhp
+    name: my-flask-app
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    branch: main
