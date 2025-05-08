@@ -18,7 +18,7 @@ cachetools==5.3.3
 certifi==2025.1.31
 cffi==1.16.0
 chardet==5.2.0
-charset-normalizer==3.3.2
+charset-normalizer>=3.4.0
 chromedriver-autoinstaller==0.6.4
 click==8.1.8
 colorama==0.4.6
@@ -120,7 +120,7 @@ python-dateutil==2.9.0.post0
 python-docx==1.1.2
 python-dotenv==1.0.1
 pytweening==1.2.0
-pytz==2024.2
+pytz>=2024.2
 PyYAML==6.0.1
 pyzmq==25.1.2
 referencing==0.35.1
