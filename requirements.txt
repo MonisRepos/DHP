@@ -120,7 +120,7 @@ python-dateutil==2.9.0.post0
 python-docx==1.1.2
 python-dotenv==1.0.1
 pytweening==1.2.0
-pytz==2024.1
+pytz==2024.2
 PyYAML==6.0.1
 pyzmq==25.1.2
 referencing==0.35.1
